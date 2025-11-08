@@ -4,10 +4,11 @@ let currentGroup = null;
 let selectedMode = null;
 let selectedPlayers = 1;
 let isReady = false;
-let currentInviterId = null;
 let currentSlotToInvite = null;
 let isSearching = false;
 let searchStartTime = 0;
+let pendingInvitations = []; // Liste des invitations en attente
+let isInMatch = false; // Savoir si on est en match
 
 // Gestion des messages depuis Lua
 window.addEventListener('message', function(event) {
@@ -25,7 +26,7 @@ window.addEventListener('message', function(event) {
         updateGroupDisplay(data.group);
     } else if (data.action === 'showInvite') {
         console.log('[PVP UI] Invitation reçue de:', data.inviterName);
-        showInvitePopup(data.inviterName, data.inviterId);
+        addInvitationToQueue(data.inviterName, data.inviterId);
     } else if (data.action === 'searchStarted') {
         console.log('[PVP UI] Recherche démarrée:', data.mode);
         showSearchStatus(data.mode);
@@ -34,9 +35,35 @@ window.addEventListener('message', function(event) {
     } else if (data.action === 'matchFound') {
         console.log('[PVP UI] Match trouvé!');
         hideSearchStatus();
+        isInMatch = true;
     } else if (data.action === 'searchCancelled') {
         console.log('[PVP UI] Recherche annulée');
         hideSearchStatus();
+    } else if (data.action === 'showRoundStart') {
+        console.log('[PVP UI] Début du round:', data.round);
+        showRoundStart(data.round);
+    } else if (data.action === 'showCountdown') {
+        console.log('[PVP UI] Countdown:', data.number);
+        showCountdown(data.number);
+    } else if (data.action === 'showGo') {
+        console.log('[PVP UI] GO!');
+        showGo();
+    } else if (data.action === 'showRoundEnd') {
+        console.log('[PVP UI] Fin du round - Gagnant:', data.winner);
+        showRoundEnd(data.winner, data.score);
+    } else if (data.action === 'showMatchEnd') {
+        console.log('[PVP UI] Fin du match - Victoire:', data.victory);
+        showMatchEnd(data.victory, data.score);
+        isInMatch = false;
+    } else if (data.action === 'updateScore') {
+        console.log('[PVP UI] Mise à jour du score:', data.score);
+        updateScoreHUD(data.score, data.round);
+    } else if (data.action === 'showScoreHUD') {
+        console.log('[PVP UI] Affichage du HUD de score');
+        showScoreHUD(data.score, data.round);
+    } else if (data.action === 'hideScoreHUD') {
+        console.log('[PVP UI] Masquage du HUD de score');
+        hideScoreHUD();
     }
 });
 
@@ -73,6 +100,179 @@ function closeUI() {
     });
 }
 
+// ========================================
+// SYSTÈME D'INVITATIONS AMÉLIORÉ
+// ========================================
+
+// Ajouter une invitation à la file d'attente
+function addInvitationToQueue(inviterName, inviterId) {
+    console.log('[PVP UI] Ajout invitation à la queue:', inviterName, inviterId);
+    
+    // Vérifier si l'invitation existe déjà
+    const exists = pendingInvitations.find(inv => inv.inviterId === inviterId);
+    if (exists) {
+        console.log('[PVP UI] Invitation déjà présente');
+        return;
+    }
+    
+    // Ajouter l'invitation
+    pendingInvitations.push({
+        inviterName: inviterName,
+        inviterId: inviterId,
+        timestamp: Date.now()
+    });
+    
+    // Mettre à jour le badge de notification
+    updateNotificationBadge();
+    
+    // Auto-suppression après 30 secondes
+    setTimeout(() => {
+        removeInvitation(inviterId);
+    }, 30000);
+}
+
+// Mettre à jour le badge de notifications
+function updateNotificationBadge() {
+    const badge = document.getElementById('notification-count');
+    const count = pendingInvitations.length;
+    
+    if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// Retirer une invitation de la queue
+function removeInvitation(inviterId) {
+    pendingInvitations = pendingInvitations.filter(inv => inv.inviterId !== inviterId);
+    updateNotificationBadge();
+    
+    // Mettre à jour le panel si ouvert
+    if (!document.getElementById('invitations-panel').classList.contains('hidden')) {
+        renderInvitationsPanel();
+    }
+}
+
+// Afficher le panel d'invitations
+function showInvitationsPanel() {
+    console.log('[PVP UI] Ouverture du panel d\'invitations');
+    document.getElementById('invitations-panel').classList.remove('hidden');
+    renderInvitationsPanel();
+}
+
+// Masquer le panel d'invitations
+function hideInvitationsPanel() {
+    console.log('[PVP UI] Fermeture du panel d\'invitations');
+    document.getElementById('invitations-panel').classList.add('hidden');
+}
+
+// Rendre le contenu du panel d'invitations
+function renderInvitationsPanel() {
+    const list = document.getElementById('invitations-list');
+    const noInvitations = document.getElementById('no-invitations');
+    
+    list.innerHTML = '';
+    
+    if (pendingInvitations.length === 0) {
+        noInvitations.classList.remove('hidden');
+        return;
+    }
+    
+    noInvitations.classList.add('hidden');
+    
+    pendingInvitations.forEach(invitation => {
+        const item = document.createElement('div');
+        item.className = 'invitation-item';
+        item.innerHTML = `
+            <div class="invitation-info">
+                <div class="invitation-from">${invitation.inviterName}</div>
+                <div class="invitation-message">Vous invite à rejoindre son groupe</div>
+            </div>
+            <div class="invitation-actions">
+                <button class="btn-accept-inv" data-inviter-id="${invitation.inviterId}">✓ Accepter</button>
+                <button class="btn-decline-inv" data-inviter-id="${invitation.inviterId}">✕ Refuser</button>
+            </div>
+        `;
+        list.appendChild(item);
+    });
+    
+    // Ajouter les événements
+    document.querySelectorAll('.btn-accept-inv').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const inviterId = parseInt(this.getAttribute('data-inviter-id'));
+            acceptInvitation(inviterId);
+        });
+    });
+    
+    document.querySelectorAll('.btn-decline-inv').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const inviterId = parseInt(this.getAttribute('data-inviter-id'));
+            declineInvitation(inviterId);
+        });
+    });
+}
+
+// Accepter une invitation
+function acceptInvitation(inviterId) {
+    console.log('[PVP UI] Acceptation invitation de:', inviterId);
+    
+    fetch(`https://${GetParentResourceName()}/acceptInvite`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            inviterId: inviterId
+        })
+    }).then(() => {
+        console.log('[PVP UI] Invitation acceptée');
+    }).catch(err => {
+        console.error('[PVP UI] Erreur acceptation:', err);
+    });
+    
+    removeInvitation(inviterId);
+    renderInvitationsPanel();
+}
+
+// Refuser une invitation
+function declineInvitation(inviterId) {
+    console.log('[PVP UI] Refus invitation de:', inviterId);
+    
+    fetch(`https://${GetParentResourceName()}/declineInvite`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    }).catch(err => {});
+    
+    removeInvitation(inviterId);
+    renderInvitationsPanel();
+}
+
+// EVENT: Clic sur la cloche de notifications
+document.getElementById('notification-bell').addEventListener('click', function() {
+    console.log('[PVP UI] Clic sur notification bell');
+    const panel = document.getElementById('invitations-panel');
+    
+    if (panel.classList.contains('hidden')) {
+        showInvitationsPanel();
+    } else {
+        hideInvitationsPanel();
+    }
+});
+
+// EVENT: Fermer le panel d'invitations
+document.getElementById('close-invitations').addEventListener('click', function() {
+    hideInvitationsPanel();
+});
+
+// ========================================
+// GESTION DES GROUPES
+// ========================================
+
 // EVENT: Bouton de fermeture
 document.getElementById('close-button').addEventListener('click', function() {
     console.log('[PVP UI] Clic sur le bouton de fermeture');
@@ -84,6 +284,15 @@ document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         console.log('[PVP UI] Touche ESC pressée');
         const container = document.getElementById('container');
+        const invitationsPanel = document.getElementById('invitations-panel');
+        
+        // Fermer le panel d'invitations en priorité
+        if (!invitationsPanel.classList.contains('hidden')) {
+            hideInvitationsPanel();
+            return;
+        }
+        
+        // Sinon fermer l'interface principale
         if (!container.classList.contains('hidden')) {
             closeUI();
         }
@@ -235,6 +444,23 @@ document.getElementById('ready-btn').addEventListener('click', function() {
     });
 });
 
+// EVENT: Bouton Quitter le groupe
+document.getElementById('leave-group-btn').addEventListener('click', function() {
+    console.log('[PVP UI] Clic sur bouton Quitter le groupe');
+    
+    fetch(`https://${GetParentResourceName()}/leaveGroup`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    }).then(() => {
+        console.log('[PVP UI] Requête leaveGroup envoyée');
+    }).catch(err => {
+        console.error('[PVP UI] Erreur leaveGroup:', err);
+    });
+});
+
 // Charger les infos du groupe
 function loadGroupInfo() {
     console.log('[PVP UI] Chargement des infos du groupe');
@@ -263,6 +489,7 @@ function updateGroupDisplay(group) {
     const hostNameEl = document.getElementById('host-name');
     const hostReadyEl = document.getElementById('ready-host');
     const readyBtn = document.getElementById('ready-btn');
+    const leaveGroupBtn = document.getElementById('leave-group-btn');
     
     // Réinitialiser tous les slots sauf le premier
     for (let i = 1; i < slots.length; i++) {
@@ -299,11 +526,19 @@ function updateGroupDisplay(group) {
         isReady = false;
         readyBtn.classList.remove('ready');
         document.getElementById('ready-text').textContent = 'SE METTRE PRÊT';
+        leaveGroupBtn.classList.add('hidden'); // Cacher le bouton si pas de groupe
         updateSearchButton();
         return;
     }
     
     console.log('[PVP UI] Mise à jour des membres du groupe');
+    
+    // Afficher le bouton Quitter si on est dans un groupe (et pas seul)
+    if (group.members.length > 1) {
+        leaveGroupBtn.classList.remove('hidden');
+    } else {
+        leaveGroupBtn.classList.add('hidden');
+    }
     
     // Mettre à jour l'hôte et les membres
     group.members.forEach((member, index) => {
@@ -483,61 +718,137 @@ document.getElementById('cancel-search-btn').addEventListener('click', function(
     });
 });
 
-// Afficher popup d'invitation
-function showInvitePopup(inviterName, inviterId) {
-    console.log('[PVP UI] Affichage popup invitation de:', inviterName);
-    currentInviterId = inviterId;
-    document.getElementById('invite-text').textContent = `${inviterName} vous invite à rejoindre son groupe`;
-    document.getElementById('invite-popup').classList.remove('hidden');
+// ========================================
+// ANIMATIONS DE COMBAT
+// ========================================
+
+function showRoundStart(roundNumber) {
+    const overlay = document.getElementById('combat-overlay');
+    const message = document.getElementById('combat-message');
+    const subtitle = document.getElementById('combat-subtitle');
+    
+    overlay.classList.remove('hidden');
+    message.textContent = `ROUND ${roundNumber}`;
+    subtitle.textContent = 'Préparez-vous';
     
     setTimeout(() => {
-        console.log('[PVP UI] Expiration auto de l\'invitation');
-        declineInvite();
-    }, 15000);
+        overlay.classList.add('hidden');
+    }, 2000);
 }
 
-// Accepter invitation
-document.getElementById('accept-invite-btn').addEventListener('click', function() {
-    console.log('[PVP UI] Acceptation de l\'invitation de:', currentInviterId);
+function showCountdown(number) {
+    const overlay = document.getElementById('combat-overlay');
+    const message = document.getElementById('combat-message');
+    const subtitle = document.getElementById('combat-subtitle');
     
-    if (currentInviterId) {
-        fetch(`https://${GetParentResourceName()}/acceptInvite`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                inviterId: currentInviterId
-            })
-        }).then(() => {
-            console.log('[PVP UI] Acceptation envoyée');
-        }).catch(err => {
-            console.error('[PVP UI] Erreur acceptation:', err);
-        });
-    }
+    overlay.classList.remove('hidden');
+    message.textContent = number;
+    subtitle.textContent = '';
     
-    document.getElementById('invite-popup').classList.add('hidden');
-    currentInviterId = null;
-});
-
-// Refuser invitation
-document.getElementById('decline-invite-btn').addEventListener('click', function() {
-    console.log('[PVP UI] Refus de l\'invitation');
-    declineInvite();
-});
-
-function declineInvite() {
-    fetch(`https://${GetParentResourceName()}/declineInvite`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-    }).catch(err => {});
-    
-    document.getElementById('invite-popup').classList.add('hidden');
-    currentInviterId = null;
+    setTimeout(() => {
+        overlay.classList.add('hidden');
+    }, 1000);
 }
+
+function showGo() {
+    const overlay = document.getElementById('combat-overlay');
+    const message = document.getElementById('combat-message');
+    const subtitle = document.getElementById('combat-subtitle');
+    
+    overlay.classList.remove('hidden');
+    message.textContent = 'GO!';
+    subtitle.textContent = 'Combattez !';
+    
+    setTimeout(() => {
+        overlay.classList.add('hidden');
+    }, 1000);
+}
+
+// ========================================
+// ANIMATIONS FIN DE ROUND & MATCH
+// ========================================
+
+function showRoundEnd(winningTeam, score) {
+    console.log('[PVP UI] Animation fin de round - Gagnant:', winningTeam);
+    
+    const overlay = document.getElementById('round-end-overlay');
+    const title = document.getElementById('round-end-title');
+    const subtitle = document.getElementById('round-end-subtitle');
+    const team1Score = document.getElementById('round-score-team1');
+    const team2Score = document.getElementById('round-score-team2');
+    
+    // Déterminer si c'est une victoire ou défaite
+    const isVictory = (winningTeam === 'team1'); // Ajuster selon la team du joueur
+    
+    title.textContent = isVictory ? 'VICTOIRE' : 'DÉFAITE';
+    title.className = 'round-end-title ' + (isVictory ? 'victory' : 'defeat');
+    subtitle.textContent = isVictory ? 'Round remporté' : 'Round perdu';
+    
+    // Afficher les scores
+    team1Score.textContent = score.team1;
+    team2Score.textContent = score.team2;
+    
+    // Afficher l'overlay
+    overlay.classList.remove('hidden');
+    
+    // Cacher après 3 secondes
+    setTimeout(() => {
+        overlay.classList.add('hidden');
+    }, 3000);
+}
+
+function showMatchEnd(victory, score) {
+    console.log('[PVP UI] Animation fin de match - Victoire:', victory);
+    
+    const overlay = document.getElementById('match-end-overlay');
+    const result = document.getElementById('match-end-result');
+    const message = document.getElementById('match-end-message');
+    const team1Score = document.getElementById('final-score-team1');
+    const team2Score = document.getElementById('final-score-team2');
+    
+    result.textContent = victory ? 'VICTOIRE' : 'DÉFAITE';
+    result.className = 'match-end-result ' + (victory ? 'victory' : 'defeat');
+    message.textContent = victory ? 'Félicitations !' : 'Dommage...';
+    
+    // Afficher les scores finaux
+    team1Score.textContent = score.team1;
+    team2Score.textContent = score.team2;
+    
+    // Afficher l'overlay
+    overlay.classList.remove('hidden');
+    
+    // Cacher après 8 secondes
+    setTimeout(() => {
+        overlay.classList.add('hidden');
+    }, 8000);
+}
+
+// ========================================
+// HUD DE SCORE IN-GAME
+// ========================================
+
+function showScoreHUD(score, round) {
+    console.log('[PVP UI] Affichage HUD de score');
+    const hud = document.getElementById('score-hud');
+    
+    updateScoreHUD(score, round);
+    hud.classList.remove('hidden');
+}
+
+function hideScoreHUD() {
+    console.log('[PVP UI] Masquage HUD de score');
+    document.getElementById('score-hud').classList.add('hidden');
+}
+
+function updateScoreHUD(score, round) {
+    document.getElementById('team1-score').textContent = score.team1;
+    document.getElementById('team2-score').textContent = score.team2;
+    document.getElementById('current-round-display').textContent = `Round ${round}`;
+}
+
+// ========================================
+// STATS & LEADERBOARD
+// ========================================
 
 // Charger les stats
 function loadStats() {

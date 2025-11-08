@@ -8,6 +8,7 @@ local queues = {
 
 local activeMatches = {}
 local playersInQueue = {} -- [playerId] = {mode, startTime}
+local playerCurrentMatch = {} -- [playerId] = matchId
 
 -- Fonction pour créer les tables en base de données
 MySQL.ready(function()
@@ -114,7 +115,8 @@ function CreateMatch(mode, players)
         team2 = {},
         score = {team1 = 0, team2 = 0},
         currentRound = 1,
-        status = 'starting'
+        status = 'starting',
+        startTime = os.time()
     }
     
     -- Diviser les joueurs en équipes
@@ -128,6 +130,9 @@ function CreateMatch(mode, players)
         
         -- Retirer de la queue
         playersInQueue[playerId] = nil
+        
+        -- Enregistrer le match actuel du joueur
+        playerCurrentMatch[playerId] = matchId
     end
     
     print(string.format('^2[PVP SERVER]^7 Match %d - Team 1: %d joueurs, Team 2: %d joueurs', 
@@ -140,6 +145,9 @@ function CreateMatch(mode, players)
     for _, playerId in ipairs(players) do
         TriggerClientEvent('pvp:matchFound', playerId)
         TriggerClientEvent('esx:showNotification', playerId, '~g~Match trouvé! ~w~Arène: ~b~' .. arena.name)
+        
+        -- Afficher le HUD de score
+        TriggerClientEvent('pvp:showScoreHUD', playerId, activeMatches[matchId].score, activeMatches[matchId].currentRound)
     end
     
     -- Attendre la fin de la téléportation
@@ -290,14 +298,12 @@ RegisterNetEvent('pvp:playerDied', function(killerId)
     print(string.format('^2[PVP SERVER]^7 Joueur %s tué par %s', victimId, killerId or 'suicide'))
     
     -- Trouver le match du joueur
-    for matchId, match in pairs(activeMatches) do
-        for _, playerId in ipairs(match.players) do
-            if playerId == victimId then
-                print(string.format('^2[PVP SERVER]^7 Mort dans le match %d', matchId))
-                HandlePlayerDeath(matchId, match, victimId, killerId)
-                return
-            end
-        end
+    local matchId = playerCurrentMatch[victimId]
+    
+    if matchId and activeMatches[matchId] then
+        local match = activeMatches[matchId]
+        print(string.format('^2[PVP SERVER]^7 Mort dans le match %d', matchId))
+        HandlePlayerDeath(matchId, match, victimId, killerId)
     end
 end)
 
@@ -377,6 +383,9 @@ function EndRound(matchId, match, winningTeam)
     for _, playerId in ipairs(match.players) do
         if playerId > 0 then
             TriggerClientEvent('pvp:roundEnd', playerId, winningTeam, match.score)
+            
+            -- Mettre à jour le HUD
+            TriggerClientEvent('pvp:updateScore', playerId, match.score, match.currentRound)
         end
     end
     
@@ -441,6 +450,9 @@ function StartRound(matchId, match, arena)
     for _, playerId in ipairs(match.players) do
         if playerId > 0 then -- Seulement les vrais joueurs
             TriggerClientEvent('pvp:roundStart', playerId, match.currentRound)
+            
+            -- Mettre à jour le HUD
+            TriggerClientEvent('pvp:updateScore', playerId, match.score, match.currentRound)
         end
     end
 end
@@ -459,8 +471,22 @@ function EndMatch(matchId, match)
     for _, winnerId in ipairs(winners) do
         if winnerId > 0 then
             UpdatePlayerWin(winnerId)
+            
+            -- Déterminer si c'est notre team
+            local isTeam1 = false
+            for _, pid in ipairs(match.team1) do
+                if pid == winnerId then
+                    isTeam1 = true
+                    break
+                end
+            end
+            
             TriggerClientEvent('pvp:matchEnd', winnerId, true, match.score)
+            TriggerClientEvent('pvp:hideScoreHUD', winnerId)
             TriggerClientEvent('esx:showNotification', winnerId, '~g~VICTOIRE!')
+            
+            -- Nettoyer le playerCurrentMatch
+            playerCurrentMatch[winnerId] = nil
         end
     end
     
@@ -468,7 +494,11 @@ function EndMatch(matchId, match)
         if loserId > 0 then
             UpdatePlayerLoss(loserId)
             TriggerClientEvent('pvp:matchEnd', loserId, false, match.score)
+            TriggerClientEvent('pvp:hideScoreHUD', loserId)
             TriggerClientEvent('esx:showNotification', loserId, '~r~DÉFAITE!')
+            
+            -- Nettoyer le playerCurrentMatch
+            playerCurrentMatch[loserId] = nil
         end
     end
     
@@ -519,6 +549,120 @@ function UpdatePlayerLoss(playerId)
     })
 end
 
+-- ========================================
+-- GESTION DES DÉCONNEXIONS
+-- ========================================
+
+-- Fonction pour gérer la déconnexion d'un joueur pendant un match
+local function HandlePlayerDisconnect(playerId)
+    print(string.format('^2[PVP SERVER]^7 Gestion de la déconnexion du joueur %s', playerId))
+    
+    local matchId = playerCurrentMatch[playerId]
+    
+    if not matchId or not activeMatches[matchId] then
+        print('^3[PVP SERVER]^7 Joueur pas en match ou match inexistant')
+        return
+    end
+    
+    local match = activeMatches[matchId]
+    
+    print(string.format('^1[PVP SERVER]^7 Joueur %s déconnecté pendant le match %d', playerId, matchId))
+    
+    -- Compter comme défaite
+    UpdatePlayerLoss(playerId)
+    
+    -- Déterminer la team du joueur
+    local playerTeam = nil
+    local isTeam1 = false
+    for _, pid in ipairs(match.team1) do
+        if pid == playerId then
+            playerTeam = 'team1'
+            isTeam1 = true
+            break
+        end
+    end
+    
+    if not playerTeam then
+        for _, pid in ipairs(match.team2) do
+            if pid == playerId then
+                playerTeam = 'team2'
+                break
+            end
+        end
+    end
+    
+    if not playerTeam then
+        print('^1[PVP SERVER]^7 Impossible de trouver la team du joueur')
+        return
+    end
+    
+    -- Notifier tous les autres joueurs
+    for _, otherPlayerId in ipairs(match.players) do
+        if otherPlayerId ~= playerId and otherPlayerId > 0 then
+            TriggerClientEvent('esx:showNotification', otherPlayerId, '~y~Un joueur s\'est déconnecté - Le match continue')
+        end
+    end
+    
+    -- Terminer le match si trop de joueurs manquants
+    local team1Count = 0
+    local team2Count = 0
+    
+    for _, pid in ipairs(match.team1) do
+        if pid > 0 and GetPlayerPing(pid) > 0 then
+            team1Count = team1Count + 1
+        end
+    end
+    
+    for _, pid in ipairs(match.team2) do
+        if pid > 0 and GetPlayerPing(pid) > 0 then
+            team2Count = team2Count + 1
+        end
+    end
+    
+    print(string.format('^2[PVP SERVER]^7 Joueurs restants - Team1: %d, Team2: %d', team1Count, team2Count))
+    
+    -- Si une team est vide, terminer le match immédiatement
+    if team1Count == 0 or team2Count == 0 then
+        print('^1[PVP SERVER]^7 Une équipe est vide - Fin immédiate du match')
+        
+        local winningTeam = team1Count > 0 and 'team1' or 'team2'
+        local winners = winningTeam == 'team1' and match.team1 or match.team2
+        
+        -- Donner la victoire à la team restante
+        if winningTeam == 'team1' then
+            match.score.team1 = Config.MaxRounds
+        else
+            match.score.team2 = Config.MaxRounds
+        end
+        
+        -- Téléporter immédiatement les survivants au lobby
+        for _, winnerId in ipairs(winners) do
+            if winnerId > 0 and GetPlayerPing(winnerId) > 0 then
+                print(string.format('^2[PVP SERVER]^7 Téléportation du gagnant %d au lobby', winnerId))
+                
+                -- Masquer le HUD
+                TriggerClientEvent('pvp:hideScoreHUD', winnerId)
+                
+                -- Téléporter au lobby SANS animation de fin
+                TriggerClientEvent('pvp:forceReturnToLobby', winnerId)
+                
+                -- Notification
+                TriggerClientEvent('esx:showNotification', winnerId, '~g~Victoire par abandon adverse!')
+                
+                -- Update stats
+                UpdatePlayerWin(winnerId)
+            end
+        end
+        
+        -- Nettoyer le match
+        Wait(2000)
+        activeMatches[matchId] = nil
+    end
+    
+    -- Nettoyer
+    playerCurrentMatch[playerId] = nil
+end
+
 -- Nettoyer les queues quand un joueur se déconnecte
 AddEventHandler('playerDropped', function()
     local src = source
@@ -538,7 +682,8 @@ AddEventHandler('playerDropped', function()
         playersInQueue[src] = nil
     end
     
-    -- TODO: Gérer la déconnexion pendant un match
+    -- Gérer la déconnexion pendant un match
+    HandlePlayerDisconnect(src)
 end)
 
 -- ========================================

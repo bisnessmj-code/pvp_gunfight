@@ -2,9 +2,9 @@ fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 
-author 'Votre Nom'
-description 'Système PVP GunFight avec matchmaking et ELO'
-version '1.0.0'
+author 'PVP GunFight'
+description 'Système PVP GunFight avec matchmaking et ELO - v2.0'
+version '2.0.0'
 
 shared_scripts {
     '@es_extended/imports.lua',

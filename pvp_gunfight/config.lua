@@ -42,7 +42,6 @@ Config.Arenas = {
             vector4(567.758240, -1768.720826, 29.145020, 212.598420)
         }
     }
-    -- Tu peux ajouter d'autres arènes facilement ici !
 }
 
 -- Configuration des loadouts

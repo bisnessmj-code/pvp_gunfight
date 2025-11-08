@@ -5,6 +5,7 @@ local pedEntity = nil
 local uiOpen = false
 local inQueue = false
 local queueStartTime = 0
+local inMatch = false
 
 -- Fonction pour spawner le PED
 local function SpawnPed()
@@ -209,12 +210,13 @@ RegisterNetEvent('pvp:receiveInvite', function(inviterName, inviterId)
     
     ESX.ShowNotification('~b~' .. inviterName .. '~w~ vous invite à rejoindre son groupe!')
     
+    -- NE PLUS afficher de popup automatiquement, juste envoyer au système de notifications
     SendNUIMessage({
         action = 'showInvite',
         inviterName = inviterName,
         inviterId = inviterId
     })
-    print('^2[PVP CLIENT]^7 Message showInvite envoyé au NUI')
+    print('^2[PVP CLIENT]^7 Message showInvite envoyé au NUI (queue système)')
 end)
 
 -- Event quand la recherche commence
@@ -233,6 +235,7 @@ end)
 RegisterNetEvent('pvp:matchFound', function()
     print('^2[PVP CLIENT]^7 Match trouvé!')
     inQueue = false
+    inMatch = true
     
     -- FERMER L'UI
     if uiOpen then
@@ -412,9 +415,42 @@ RegisterNetEvent('pvp:roundEnd', function(winningTeam, score)
     PlaySoundFrontend(-1, "CHECKPOINT_PERFECT", "HUD_MINI_GAME_SOUNDSET", true)
 end)
 
+-- Event pour mettre à jour le score
+RegisterNetEvent('pvp:updateScore', function(score, round)
+    print(string.format('^2[PVP CLIENT]^7 Mise à jour score - Team1: %d, Team2: %d, Round: %d', score.team1, score.team2, round))
+    
+    SendNUIMessage({
+        action = 'updateScore',
+        score = score,
+        round = round
+    })
+end)
+
+-- Event pour afficher le HUD de score
+RegisterNetEvent('pvp:showScoreHUD', function(score, round)
+    print('^2[PVP CLIENT]^7 Affichage HUD de score')
+    
+    SendNUIMessage({
+        action = 'showScoreHUD',
+        score = score,
+        round = round
+    })
+end)
+
+-- Event pour masquer le HUD de score
+RegisterNetEvent('pvp:hideScoreHUD', function()
+    print('^2[PVP CLIENT]^7 Masquage HUD de score')
+    
+    SendNUIMessage({
+        action = 'hideScoreHUD'
+    })
+end)
+
 -- Event pour la fin du match
 RegisterNetEvent('pvp:matchEnd', function(victory, score)
     print(string.format('^2[PVP CLIENT]^7 Fin du match - Victoire: %s', tostring(victory)))
+    
+    inMatch = false
     
     -- Animation HTML
     SendNUIMessage({
@@ -469,6 +505,11 @@ CreateThread(function()
     while true do
         Wait(1000)
         
+        -- Ne vérifier que si on est en match
+        if not inMatch then
+            goto continue
+        end
+        
         local ped = PlayerPedId()
         
         if IsEntityDead(ped) then
@@ -491,6 +532,8 @@ CreateThread(function()
                 Wait(100)
             end
         end
+        
+        ::continue::
     end
 end)
 
@@ -509,6 +552,7 @@ CreateThread(function()
         end
     end
 end)
+
 CreateThread(function()
     print('^2[PVP CLIENT]^7 Thread principal démarré')
     SpawnPed()

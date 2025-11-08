@@ -15,6 +15,11 @@
                     <h1>🎯 RANKED PVP</h1>
                     <span class="season">Saison 1</span>
                 </div>
+                <!-- BOUTON NOTIFICATIONS INVITATIONS -->
+                <div class="notification-bell" id="notification-bell">
+                    <span class="bell-icon">🔔</span>
+                    <span class="notification-badge hidden" id="notification-count">0</span>
+                </div>
                 <button class="close-btn" id="close-button">✕</button>
             </div>
 
@@ -86,10 +91,13 @@
                             </div>
                         </div>
 
-                        <!-- BOUTON READY -->
+                        <!-- BOUTONS READY ET LEAVE -->
                         <div class="ready-section">
                             <button class="btn-ready" id="ready-btn">
                                 <span id="ready-text">SE METTRE PRÊT</span>
+                            </button>
+                            <button class="btn-leave-group hidden" id="leave-group-btn">
+                                <span>QUITTER LE GROUPE</span>
                             </button>
                         </div>
                     </div>
@@ -237,16 +245,17 @@
         </div>
     </div>
 
-    <!-- POPUP INVITATION -->
-    <div id="invite-popup" class="invite-popup hidden">
-        <div class="invite-content">
-            <div class="invite-icon">📩</div>
-            <h3>Invitation reçue</h3>
-            <p id="invite-text"></p>
-            <div class="invite-buttons">
-                <button class="btn-accept" id="accept-invite-btn">Accepter</button>
-                <button class="btn-decline" id="decline-invite-btn">Refuser</button>
-            </div>
+    <!-- PANEL NOTIFICATIONS INVITATIONS -->
+    <div id="invitations-panel" class="invitations-panel hidden">
+        <div class="panel-header">
+            <h3>📩 Invitations de groupe</h3>
+            <button class="panel-close" id="close-invitations">✕</button>
+        </div>
+        <div class="invitations-list" id="invitations-list">
+            <!-- Rempli dynamiquement -->
+        </div>
+        <div class="no-invitations hidden" id="no-invitations">
+            <p>Aucune invitation en attente</p>
         </div>
     </div>
 
@@ -262,10 +271,54 @@
         </div>
     </div>
 
+    <!-- HUD DE SCORE IN-GAME -->
+    <div id="score-hud" class="score-hud hidden">
+        <div class="hud-container">
+            <div class="team-score team-blue">
+                <div class="team-label">TEAM A</div>
+                <div class="team-rounds" id="team1-score">0</div>
+            </div>
+            <div class="score-separator">-</div>
+            <div class="team-score team-red">
+                <div class="team-rounds" id="team2-score">0</div>
+                <div class="team-label">TEAM B</div>
+            </div>
+        </div>
+        <div class="round-info">
+            <span id="current-round-display">Round 1</span>
+        </div>
+    </div>
+
     <!-- OVERLAY ANIMATIONS COMBAT -->
     <div id="combat-overlay" class="combat-overlay hidden">
         <div class="combat-message" id="combat-message"></div>
         <div class="combat-subtitle" id="combat-subtitle"></div>
+    </div>
+
+    <!-- ANIMATION FIN DE ROUND -->
+    <div id="round-end-overlay" class="round-end-overlay hidden">
+        <div class="round-end-content">
+            <div class="round-end-title" id="round-end-title">VICTOIRE</div>
+            <div class="round-end-score">
+                <span class="score-team blue" id="round-score-team1">0</span>
+                <span class="score-separator">-</span>
+                <span class="score-team red" id="round-score-team2">0</span>
+            </div>
+            <div class="round-end-subtitle" id="round-end-subtitle">Round remporté</div>
+        </div>
+    </div>
+
+    <!-- ANIMATION FIN DE MATCH -->
+    <div id="match-end-overlay" class="match-end-overlay hidden">
+        <div class="match-end-content">
+            <div class="match-end-result" id="match-end-result">VICTOIRE</div>
+            <div class="match-end-score">
+                <span class="final-score-team blue" id="final-score-team1">0</span>
+                <span class="final-score-separator">-</span>
+                <span class="final-score-team red" id="final-score-team2">0</span>
+            </div>
+            <div class="match-end-message" id="match-end-message">Félicitations !</div>
+        </div>
     </div>
 
     <script src="script.js"></script>
