@@ -298,10 +298,13 @@ RegisterNetEvent('pvp:teleportToSpawn', function(spawn, team, matchId)
     ClearPedBloodDamage(ped)
     ResetPedVisibleDamage(ped)
     
-    -- DONNER L'ARME CAL50
+    -- DONNER UNIQUEMENT LE CAL50
     RemoveAllPedWeapons(ped, true)
     GiveWeaponToPed(ped, GetHashKey('WEAPON_PISTOL50'), 250, false, true)
     SetCurrentPedWeapon(ped, GetHashKey('WEAPON_PISTOL50'), true)
+    
+    -- Munitions infinies
+    SetPedInfiniteAmmoClip(ped, true)
     
     Wait(500)
     
@@ -342,10 +345,13 @@ RegisterNetEvent('pvp:respawnPlayer', function(spawn)
     ClearPedBloodDamage(ped)
     ResetPedVisibleDamage(ped)
     
-    -- DONNER L'ARME CAL50
+    -- DONNER UNIQUEMENT LE CAL50
     RemoveAllPedWeapons(ped, true)
     GiveWeaponToPed(ped, GetHashKey('WEAPON_PISTOL50'), 250, false, true)
     SetCurrentPedWeapon(ped, GetHashKey('WEAPON_PISTOL50'), true)
+    
+    -- Munitions infinies
+    SetPedInfiniteAmmoClip(ped, true)
     
     Wait(300)
     
@@ -492,12 +498,54 @@ RegisterNetEvent('pvp:matchEnd', function(victory, score)
     ClearPedBloodDamage(ped)
     ResetPedVisibleDamage(ped)
     
-    -- Retirer les armes
+    -- Retirer TOUTES les armes
     RemoveAllPedWeapons(ped, true)
+    
+    -- Désactiver les munitions infinies
+    SetPedInfiniteAmmoClip(ped, false)
     
     DoScreenFadeIn(500)
     
     ESX.ShowNotification('~b~Retour au lobby')
+end)
+
+-- FIX PROBLEME 2: Event pour retour forcé au lobby (déconnexion adverse)
+RegisterNetEvent('pvp:forceReturnToLobby', function()
+    print('^2[PVP CLIENT]^7 Retour forcé au lobby')
+    
+    inMatch = false
+    
+    local ped = PlayerPedId()
+    
+    -- RESSUSCITER SI MORT
+    if IsEntityDead(ped) then
+        local coords = GetEntityCoords(ped)
+        local heading = GetEntityHeading(ped)
+        NetworkResurrectLocalPlayer(coords.x, coords.y, coords.z, heading, true, false)
+        Wait(100)
+    end
+    
+    -- Fade out
+    DoScreenFadeOut(500)
+    Wait(500)
+    
+    -- Téléporter au spawn PVP
+    SetEntityCoords(ped, Config.PedLocation.coords.x, Config.PedLocation.coords.y, Config.PedLocation.coords.z, false, false, false, false)
+    SetEntityHeading(ped, Config.PedLocation.coords.w)
+    
+    -- Heal et cleanup
+    SetEntityHealth(ped, 200)
+    SetPedArmour(ped, 0)
+    ClearPedBloodDamage(ped)
+    ResetPedVisibleDamage(ped)
+    RemoveAllPedWeapons(ped, true)
+    FreezeEntityPosition(ped, false)
+    
+    -- Désactiver les munitions infinies
+    SetPedInfiniteAmmoClip(ped, false)
+    
+    -- Fade in
+    DoScreenFadeIn(500)
 end)
 
 -- Détecter la mort du joueur
@@ -534,6 +582,63 @@ CreateThread(function()
         end
         
         ::continue::
+    end
+end)
+
+-- FIX PROBLEME 3: Thread STRICT pour bloquer TOUTES les armes sauf Cal50
+CreateThread(function()
+    local cal50Hash = GetHashKey('WEAPON_PISTOL50')
+    
+    while true do
+        Wait(0)
+        
+        if inMatch then
+            local ped = PlayerPedId()
+            
+            -- S'assurer qu'on a UNIQUEMENT le Cal50
+            local hasWeapon, weaponHash = GetCurrentPedWeapon(ped, true)
+            
+            -- Si on n'a pas d'arme ou que ce n'est pas le Cal50
+            if not hasWeapon or weaponHash ~= cal50Hash then
+                print('^3[PVP CLIENT]^7 Arme incorrecte détectée, correction...')
+                
+                -- Supprimer TOUTES les armes
+                RemoveAllPedWeapons(ped, true)
+                
+                -- Redonner uniquement le Cal50
+                GiveWeaponToPed(ped, cal50Hash, 250, false, true)
+                SetCurrentPedWeapon(ped, cal50Hash, true)
+                SetPedInfiniteAmmoClip(ped, true)
+            end
+            
+            -- Bloquer TOUTES les touches de changement d'arme
+            -- Molette
+            DisableControlAction(0, 14, true)  -- INPUT_WEAPON_WHEEL_NEXT
+            DisableControlAction(0, 15, true)  -- INPUT_WEAPON_WHEEL_PREV
+            DisableControlAction(0, 16, true)  -- INPUT_SELECT_NEXT_WEAPON
+            DisableControlAction(0, 17, true)  -- INPUT_SELECT_PREV_WEAPON
+            
+            -- Wheel d'armes (TAB)
+            DisableControlAction(0, 37, true)  -- INPUT_SELECT_WEAPON
+            
+            -- Touches de raccourci 1-9 (tous les slots d'armes)
+            DisableControlAction(0, 157, true) -- INPUT_SELECT_WEAPON_UNARMED
+            DisableControlAction(0, 158, true) -- INPUT_SELECT_WEAPON_MELEE  
+            DisableControlAction(0, 159, true) -- INPUT_SELECT_WEAPON_HANDGUN
+            DisableControlAction(0, 160, true) -- INPUT_SELECT_WEAPON_SHOTGUN
+            DisableControlAction(0, 161, true) -- INPUT_SELECT_WEAPON_SMG
+            DisableControlAction(0, 162, true) -- INPUT_SELECT_WEAPON_AUTO_RIFLE
+            DisableControlAction(0, 163, true) -- INPUT_SELECT_WEAPON_SNIPER
+            DisableControlAction(0, 164, true) -- INPUT_SELECT_WEAPON_HEAVY
+            DisableControlAction(0, 165, true) -- INPUT_SELECT_WEAPON_SPECIAL
+            
+            -- Ne PAS bloquer le tir - le joueur doit pouvoir tirer avec le Cal50
+            -- DisableControlAction(0, 24, true) est retiré pour permettre de tirer
+            
+        else
+            -- Hors match, attendre plus longtemps
+            Wait(500)
+        end
     end
 end)
 

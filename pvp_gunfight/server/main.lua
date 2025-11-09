@@ -133,6 +133,12 @@ function CreateMatch(mode, players)
         
         -- Enregistrer le match actuel du joueur
         playerCurrentMatch[playerId] = matchId
+        
+        -- FIX PROBLEME 4: Retirer le joueur de son groupe quand il entre en match
+        if playerId > 0 then -- Seulement les vrais joueurs
+            -- Appel de la fonction exportée depuis groups.lua
+            RemovePlayerFromGroup(playerId)
+        end
     end
     
     print(string.format('^2[PVP SERVER]^7 Match %d - Team 1: %d joueurs, Team 2: %d joueurs', 
@@ -550,7 +556,7 @@ function UpdatePlayerLoss(playerId)
 end
 
 -- ========================================
--- GESTION DES DÉCONNEXIONS
+-- GESTION DES DÉCONNEXIONS - FIX PROBLEME 2
 -- ========================================
 
 -- Fonction pour gérer la déconnexion d'un joueur pendant un match
@@ -599,22 +605,22 @@ local function HandlePlayerDisconnect(playerId)
     -- Notifier tous les autres joueurs
     for _, otherPlayerId in ipairs(match.players) do
         if otherPlayerId ~= playerId and otherPlayerId > 0 then
-            TriggerClientEvent('esx:showNotification', otherPlayerId, '~y~Un joueur s\'est déconnecté - Le match continue')
+            TriggerClientEvent('esx:showNotification', otherPlayerId, '~y~Un joueur s\'est déconnecté')
         end
     end
     
-    -- Terminer le match si trop de joueurs manquants
+    -- Compter les joueurs restants dans chaque équipe
     local team1Count = 0
     local team2Count = 0
     
     for _, pid in ipairs(match.team1) do
-        if pid > 0 and GetPlayerPing(pid) > 0 then
+        if pid > 0 and GetPlayerPing(pid) > 0 and pid ~= playerId then
             team1Count = team1Count + 1
         end
     end
     
     for _, pid in ipairs(match.team2) do
-        if pid > 0 and GetPlayerPing(pid) > 0 then
+        if pid > 0 and GetPlayerPing(pid) > 0 and pid ~= playerId then
             team2Count = team2Count + 1
         end
     end
@@ -628,7 +634,7 @@ local function HandlePlayerDisconnect(playerId)
         local winningTeam = team1Count > 0 and 'team1' or 'team2'
         local winners = winningTeam == 'team1' and match.team1 or match.team2
         
-        -- Donner la victoire à la team restante
+        -- Donner la victoire maximale à la team restante
         if winningTeam == 'team1' then
             match.score.team1 = Config.MaxRounds
         else
@@ -637,7 +643,7 @@ local function HandlePlayerDisconnect(playerId)
         
         -- Téléporter immédiatement les survivants au lobby
         for _, winnerId in ipairs(winners) do
-            if winnerId > 0 and GetPlayerPing(winnerId) > 0 then
+            if winnerId > 0 and GetPlayerPing(winnerId) > 0 and winnerId ~= playerId then
                 print(string.format('^2[PVP SERVER]^7 Téléportation du gagnant %d au lobby', winnerId))
                 
                 -- Masquer le HUD
@@ -651,12 +657,15 @@ local function HandlePlayerDisconnect(playerId)
                 
                 -- Update stats
                 UpdatePlayerWin(winnerId)
+                
+                -- Nettoyer
+                playerCurrentMatch[winnerId] = nil
             end
         end
         
-        -- Nettoyer le match
-        Wait(2000)
+        -- Nettoyer le match immédiatement
         activeMatches[matchId] = nil
+        print('^2[PVP SERVER]^7 Match supprimé')
     end
     
     -- Nettoyer
@@ -789,6 +798,3 @@ RegisterCommand('showqueues', function(source, args)
     
     TriggerClientEvent('esx:showNotification', source, '~b~Infos dans la console F8')
 end, true)
-
--- Gérer les bots dans les events de téléportation
--- Les bots ne sont pas téléportés mais comptés dans le match

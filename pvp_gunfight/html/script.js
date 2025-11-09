@@ -349,7 +349,7 @@ function updatePlayerSlots() {
     const slots = document.querySelectorAll('.player-slot');
     
     slots.forEach((slot, index) => {
-        if (index === 0) return; // Skip host slot
+        if (index === 0) return; // Skip premier slot (toujours utilisé)
         
         if (index < selectedPlayers) {
             console.log('[PVP UI] Slot', index, 'activé');
@@ -480,19 +480,17 @@ function loadGroupInfo() {
     });
 }
 
-// Mettre à jour l'affichage du groupe
+// FIX: Mettre à jour l'affichage du groupe - CORRECTION COMPLÈTE
 function updateGroupDisplay(group) {
     console.log('[PVP UI] updateGroupDisplay() appelée avec:', group);
     currentGroup = group;
     
     const slots = document.querySelectorAll('.player-slot');
-    const hostNameEl = document.getElementById('host-name');
-    const hostReadyEl = document.getElementById('ready-host');
     const readyBtn = document.getElementById('ready-btn');
     const leaveGroupBtn = document.getElementById('leave-group-btn');
     
-    // Réinitialiser tous les slots sauf le premier
-    for (let i = 1; i < slots.length; i++) {
+    // Réinitialiser tous les slots
+    for (let i = 0; i < slots.length; i++) {
         const slot = slots[i];
         slot.className = 'player-slot empty-slot';
         
@@ -507,7 +505,7 @@ function updateGroupDisplay(group) {
             slot.onclick = function() {
                 openInvitePopup(i);
             };
-        } else {
+        } else if (i > 0) {
             slot.classList.add('locked');
             slot.innerHTML = `
                 <div class="empty-content">
@@ -519,77 +517,113 @@ function updateGroupDisplay(group) {
         }
     }
     
+    // Si pas de groupe, afficher "Vous" dans le premier slot
     if (!group || !group.members || group.members.length === 0) {
         console.log('[PVP UI] Aucun groupe actif');
-        hostNameEl.textContent = 'Vous';
-        hostReadyEl.classList.remove('ready');
+        
+        const firstSlot = slots[0];
+        firstSlot.className = 'player-slot host-slot';
+        firstSlot.innerHTML = `
+            <div class="slot-content">
+                <div class="player-avatar">
+                    <img src="https://i.imgur.com/6VBx3io.png" alt="avatar">
+                </div>
+                <div class="player-info">
+                    <div class="player-name">Vous</div>
+                    <div class="player-status">
+                        <span class="host-badge">👑 Hôte</span>
+                    </div>
+                </div>
+                <div class="player-ready">
+                    <div class="ready-indicator"></div>
+                </div>
+            </div>
+        `;
+        
         isReady = false;
         readyBtn.classList.remove('ready');
         document.getElementById('ready-text').textContent = 'SE METTRE PRÊT';
-        leaveGroupBtn.classList.add('hidden'); // Cacher le bouton si pas de groupe
+        leaveGroupBtn.classList.add('hidden');
         updateSearchButton();
         return;
     }
     
-    console.log('[PVP UI] Mise à jour des membres du groupe');
+    console.log('[PVP UI] Mise à jour des membres du groupe - Total:', group.members.length);
     
-    // Afficher le bouton Quitter si on est dans un groupe (et pas seul)
+    // FIX: Afficher TOUS les membres correctement
+    let currentPlayerIndex = -1;
+    let isLeader = false;
+    
+    // Trouver si on est le leader
+    for (let i = 0; i < group.members.length; i++) {
+        if (group.members[i].isYou) {
+            currentPlayerIndex = i;
+            isLeader = group.members[i].isLeader;
+            isReady = group.members[i].isReady;
+            break;
+        }
+    }
+    
+    console.log('[PVP UI] Joueur actuel - Index:', currentPlayerIndex, 'Leader:', isLeader, 'Ready:', isReady);
+    
+    // Afficher tous les membres dans l'ordre
+    group.members.forEach((member, index) => {
+        if (index >= slots.length) return;
+        
+        console.log('[PVP UI] Affichage membre', index, ':', member.name, '(Leader:', member.isLeader, ', Vous:', member.isYou, ', Ready:', member.isReady, ')');
+        
+        const slot = slots[index];
+        slot.className = 'player-slot';
+        
+        // Ajouter la classe host-slot si c'est le leader
+        if (member.isLeader) {
+            slot.classList.add('host-slot');
+        }
+        
+        // Ajouter la classe ready si le membre est prêt
+        if (member.isReady) {
+            slot.classList.add('ready');
+        }
+        
+        // Déterminer si on peut kick ce joueur
+        const canKick = isLeader && !member.isLeader && !member.isYou;
+        
+        // Construire le HTML du slot
+        slot.innerHTML = `
+            <div class="slot-content">
+                <div class="player-avatar">
+                    <img src="https://i.imgur.com/6VBx3io.png" alt="avatar">
+                </div>
+                <div class="player-info">
+                    <div class="player-name">${member.name}${member.isYou ? ' (Vous)' : ''}</div>
+                    <div class="player-status">
+                        ${member.isLeader ? '<span class="host-badge">👑 Hôte</span>' : '<span class="player-id">ID: ' + member.id + '</span>'}
+                    </div>
+                </div>
+                <div class="player-ready">
+                    <div class="ready-indicator ${member.isReady ? 'ready' : ''}"></div>
+                    ${canKick ? '<button class="btn-kick" onclick="kickPlayer(' + member.id + ')">KICK</button>' : ''}
+                </div>
+            </div>
+        `;
+        slot.onclick = null;
+    });
+    
+    // Mettre à jour le bouton Ready
+    if (isReady) {
+        readyBtn.classList.add('ready');
+        document.getElementById('ready-text').textContent = '✓ PRÊT';
+    } else {
+        readyBtn.classList.remove('ready');
+        document.getElementById('ready-text').textContent = 'SE METTRE PRÊT';
+    }
+    
+    // Afficher le bouton Quitter si on est dans un groupe ET qu'on n'est PAS seul
     if (group.members.length > 1) {
         leaveGroupBtn.classList.remove('hidden');
     } else {
         leaveGroupBtn.classList.add('hidden');
     }
-    
-    // Mettre à jour l'hôte et les membres
-    group.members.forEach((member, index) => {
-        console.log('[PVP UI] Membre', index, ':', member);
-        
-        if (index === 0 || member.isYou) {
-            // C'est nous (l'hôte)
-            hostNameEl.textContent = member.name;
-            
-            if (member.isReady) {
-                hostReadyEl.classList.add('ready');
-                isReady = true;
-                readyBtn.classList.add('ready');
-                document.getElementById('ready-text').textContent = '✓ PRÊT';
-            } else {
-                hostReadyEl.classList.remove('ready');
-                isReady = false;
-                readyBtn.classList.remove('ready');
-                document.getElementById('ready-text').textContent = 'SE METTRE PRÊT';
-            }
-        } else if (index < slots.length) {
-            // Autres membres
-            const slot = slots[index];
-            slot.className = 'player-slot';
-            
-            if (member.isReady) {
-                slot.classList.add('ready');
-            }
-            
-            const canKick = group.leaderId === member.yourId && !member.isLeader;
-            
-            slot.innerHTML = `
-                <div class="slot-content">
-                    <div class="player-avatar">
-                        <img src="https://i.imgur.com/6VBx3io.png" alt="avatar">
-                    </div>
-                    <div class="player-info">
-                        <div class="player-name">${member.name}</div>
-                        <div class="player-status">
-                            <span class="player-id">ID: ${member.id}</span>
-                        </div>
-                    </div>
-                    <div class="player-ready">
-                        <div class="ready-indicator ${member.isReady ? 'ready' : ''}"></div>
-                        ${canKick ? `<button class="btn-kick" onclick="kickPlayer(${member.id})">KICK</button>` : ''}
-                    </div>
-                </div>
-            `;
-            slot.onclick = null;
-        }
-    });
     
     updateSearchButton();
 }
@@ -613,7 +647,7 @@ function kickPlayer(targetId) {
     });
 }
 
-// Mettre à jour le bouton de recherche
+// FIX: Mettre à jour le bouton de recherche - Seul le leader peut lancer
 function updateSearchButton() {
     console.log('[PVP UI] Mise à jour du bouton de recherche');
     const searchBtn = document.getElementById('search-btn');
@@ -633,10 +667,27 @@ function updateSearchButton() {
         return;
     }
     
+    // Vérifier si on est le leader
+    let isLeader = false;
+    for (let i = 0; i < currentGroup.members.length; i++) {
+        if (currentGroup.members[i].isYou && currentGroup.members[i].isLeader) {
+            isLeader = true;
+            break;
+        }
+    }
+    
+    // FIX: Seul le leader peut lancer la recherche
+    if (!isLeader) {
+        console.log('[PVP UI] Vous n\'êtes pas le leader');
+        searchBtn.disabled = true;
+        searchText.textContent = 'SEUL L\'HÔTE PEUT LANCER';
+        return;
+    }
+    
     const allReady = currentGroup.members.every(m => m.isReady);
     const correctSize = currentGroup.members.length === selectedPlayers;
     
-    console.log('[PVP UI] Vérifications - Tous prêts:', allReady, '- Bonne taille:', correctSize);
+    console.log('[PVP UI] Vérifications - Tous prêts:', allReady, '- Bonne taille:', correctSize, '- Leader:', isLeader);
     
     if (!correctSize) {
         searchBtn.disabled = true;
