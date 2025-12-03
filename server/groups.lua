@@ -21,8 +21,8 @@ local function CreateGroup(leaderId)
     return groupId
 end
 
--- Fonction pour obtenir le groupe d'un joueur
-local function GetPlayerGroup(playerId)
+-- Fonction pour obtenir le groupe d'un joueur (MAINTENANT EXPORTÉE)
+function GetPlayerGroup(playerId)
     local groupId = playerGroups[playerId]
     if groupId then
         return groups[groupId]
@@ -71,7 +71,7 @@ function GetGroupData(playerId)
     }
 end
 
--- FIX: Fonction pour retirer un joueur de son groupe (EXPORTÉE)
+-- Fonction pour retirer un joueur de son groupe (EXPORTÉE)
 function RemovePlayerFromGroup(playerId)
     local group = GetPlayerGroup(playerId)
     if not group then 
@@ -109,7 +109,7 @@ function RemovePlayerFromGroup(playerId)
     end
 end
 
--- Event: Inviter un joueur - FIX: Retirer automatiquement du groupe précédent
+-- Event: Inviter un joueur
 RegisterNetEvent('pvp:inviteToGroup', function(targetId)
     local src = source
     print(string.format('^2[PVP SERVER]^7 %s invite le joueur %s', src, targetId))
@@ -128,7 +128,7 @@ RegisterNetEvent('pvp:inviteToGroup', function(targetId)
         return
     end
     
-    -- FIX PROBLEME: Si le joueur cible est déjà dans un groupe, le retirer automatiquement
+    -- Si le joueur cible est déjà dans un groupe, le retirer automatiquement
     if GetPlayerGroup(targetId) then
         print(string.format('^2[PVP SERVER]^7 Le joueur %d est déjà dans un groupe, retrait automatique', targetId))
         RemovePlayerFromGroup(targetId)
@@ -160,7 +160,7 @@ RegisterNetEvent('pvp:inviteToGroup', function(targetId)
     TriggerClientEvent('esx:showNotification', src, '~b~Invitation envoyée à ' .. xTarget.getName())
 end)
 
--- Event: Accepter une invitation - FIX PROBLEME 1: Meilleure synchronisation
+-- Event: Accepter une invitation
 RegisterNetEvent('pvp:acceptInvite', function(inviterId)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
@@ -206,19 +206,13 @@ RegisterNetEvent('pvp:acceptInvite', function(inviterId)
         TriggerClientEvent('esx:showNotification', inviterId, '~g~' .. xPlayer.getName() .. ' a rejoint le groupe')
     end
     
-    -- FIX PROBLEME 1: Broadcast immédiat à TOUS les membres
-    print(string.format('^2[PVP SERVER]^7 Broadcast du groupe après ajout de %s', src))
-    
-    -- Attendre un peu pour s'assurer que tout est synchronisé
+    -- Broadcast immédiat à TOUS les membres
     Wait(200)
-    
-    -- Envoyer à tous les membres du groupe
     BroadcastToGroup(group.id)
     
-    -- Double sécurité : envoyer directement au nouveau membre aussi
+    -- Double sécurité
     Wait(100)
     local groupData = GetGroupData(src)
-    print(string.format('^2[PVP SERVER]^7 Envoi direct des données au nouveau membre %s', src))
     TriggerClientEvent('pvp:updateGroupUI', src, groupData)
 end)
 
@@ -307,7 +301,6 @@ RegisterNetEvent('pvp:toggleReady', function()
     
     if not group then
         print('^2[PVP SERVER]^7 Pas de groupe, création auto')
-        -- Créer un groupe solo
         CreateGroup(src)
         group = GetPlayerGroup(src)
     end
@@ -362,5 +355,6 @@ AddEventHandler('playerDropped', function()
     pendingInvites[src] = nil
 end)
 
--- EXPORT de la fonction RemovePlayerFromGroup
+-- EXPORTS pour les autres fichiers
+exports('GetPlayerGroup', GetPlayerGroup)
 exports('RemovePlayerFromGroup', RemovePlayerFromGroup)
