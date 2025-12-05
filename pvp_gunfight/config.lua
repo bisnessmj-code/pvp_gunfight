@@ -2,7 +2,7 @@ Config = {}
 
 -- Configuration du PED
 Config.PedLocation = {
-    coords = vector4(-426.474732, 1131.349488, 325.887208, 263.62207), -- Coordonnées devant le commissariat (exemple)
+    coords = vector4(-2658.606690, -761.024170, 5.993408, 175.748032), -- Coordonnées devant le commissariat (exemple)
     model = 's_m_y_dealer_01', -- Modèle du PED
     scenario = 'WORLD_HUMAN_CLIPBOARD' -- Animation du PED
 }
