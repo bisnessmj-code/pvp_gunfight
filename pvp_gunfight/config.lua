@@ -15,6 +15,11 @@ Config.Arenas = {
     -- Arènes originales
     ['arena_industrial_1'] = {
         name = "Zone Industrielle #1",
+        -- Zone de combat (dome vert)
+        zone = {
+            center = vector3(474.5, -1677.5, 29.2), -- Centre de l'arène
+            radius = 35.0 -- Rayon en mètres
+        },
         teamA = {
             vector4(463.107696, -1668.487916, 29.313598, 240.944886),
             vector4(464.597808, -1667.208740, 29.313598, 294.803162),
@@ -30,6 +35,11 @@ Config.Arenas = {
     },
     ['arena_industrial_2'] = {
         name = "Zone Industrielle #2",
+        -- Zone de combat
+        zone = {
+            center = vector3(563.0, -1778.5, 29.2),
+            radius = 35.0
+        },
         teamA = {
             vector4(560.202210, -1788.725220, 29.195556, 306.141724),
             vector4(558.408814, -1788.039550, 29.195556, 79.370080),
@@ -47,6 +57,11 @@ Config.Arenas = {
     -- Skatepark
     ['arena_skatepark'] = {
         name = "Skatepark",
+        -- Zone de combat
+        zone = {
+            center = vector3(-941.0, -792.0, 15.9),
+            radius = 35.0
+        },
         teamA = {
             vector4(-950.953858, -800.123046, 15.917968, 320.314972),
             vector4(-949.318664, -801.626342, 15.917968, 320.314972),
@@ -64,6 +79,11 @@ Config.Arenas = {
     -- Restaurant
     ['arena_restaurant'] = {
         name = "Restaurant",
+        -- Zone de combat
+        zone = {
+            center = vector3(2581.0, 475.0, 108.5),
+            radius = 35.0
+        },
         teamA = {
             vector4(2579.815430, 494.940674, 108.474000, 187.086608),
             vector4(2580.171386, 491.920868, 108.507690, 189.921264),
@@ -84,6 +104,11 @@ Config.Arenas = {
 
     ['arena_mazebank'] = {
         name = "Maze Bank",
+        -- Zone de combat
+        zone = {
+            center = vector3(-247.5, -1900.0, 27.7),
+            radius = 45.0
+        },
         teamA = {
             vector4(-259.608796, -1914.580200, 27.746460, 323.149598),
             vector4(-258.356048, -1915.556030, 27.746460, 308.976380),
@@ -100,6 +125,11 @@ Config.Arenas = {
 
     ['arena_sandy'] = {
         name = "Sandy Shores",
+        -- Zone de combat
+        zone = {
+            center = vector3(236.5, 3103.0, 42.4),
+            radius = 35.0
+        },
         teamA = {
             vector4(236.413192, 3103.925292, 42.405884, 277.795288),
             vector4(238.602204, 3104.162598, 42.422730, 277.795288),
@@ -116,6 +146,11 @@ Config.Arenas = {
 
     ['arena_lucky'] = {
         name = "Lucky Street",
+        -- Zone de combat
+        zone = {
+            center = vector3(142.0, -1471.0, 29.2),
+            radius = 35.0
+        },
         teamA = {
             vector4(132.487916, -1461.995606, 29.347290, 232.440948),
             vector4(130.536270, -1462.971436, 29.347290, 229.606292),
@@ -132,6 +167,11 @@ Config.Arenas = {
 
     ['arena_chiotes'] = {
         name = "Chiotes",
+        -- Zone de combat
+        zone = {
+            center = vector3(-1389.5, -1326.0, 4.15),
+            radius = 35.0
+        },
         teamA = {
             vector4(-1392.224122, -1335.507690, 4.139892, 348.661408),
             vector4(-1390.232910, -1335.982422, 4.156738, 320.314972),
@@ -148,6 +188,11 @@ Config.Arenas = {
 
     ['arena_toit'] = {
         name = "Toit Maze",
+        -- Zone de combat
+        zone = {
+            center = vector3(103.0, -872.0, 134.75),
+            radius = 35.0
+        },
         teamA = {
             vector4(86.465934, -866.307678, 134.759766, 255.118104),
             vector4(87.059342, -864.171448, 134.759766, 255.118104),
@@ -164,6 +209,11 @@ Config.Arenas = {
 
     ['arena_maison'] = {
         name = "Maison de Luxe",
+        -- Zone de combat
+        zone = {
+            center = vector3(-130.0, 1012.5, 235.85),
+            radius = 35.0
+        },
         teamA = {
             vector4(-119.960434, 1015.832946, 235.808106, 113.385826),
             vector4(-120.791206, 1017.824158, 235.824952, 110.551186),

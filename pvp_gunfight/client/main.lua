@@ -6,6 +6,7 @@ local uiOpen = false
 local inQueue = false
 local queueStartTime = 0
 local inMatch = false
+local playerTeam = nil -- Stocke l'équipe du joueur (team1 ou team2)
 
 -- Fonction pour spawner le PED
 local function SpawnPed()
@@ -267,10 +268,16 @@ RegisterNUICallback('cancelSearch', function(data, cb)
     print('^2[PVP CLIENT]^7 Event pvp:cancelSearch envoyé')
 end)
 
--- Event pour téléporter à un spawn
-RegisterNetEvent('pvp:teleportToSpawn', function(spawn, team, matchId)
-    print(string.format('^2[PVP CLIENT]^7 Téléportation au spawn - Team: %s, Match: %d', team, matchId))
+-- ========================================
+-- EVENT TÉLÉPORTATION AVEC ACTIVATION ZONES
+-- ========================================
+RegisterNetEvent('pvp:teleportToSpawn', function(spawn, team, matchId, arenaKey)
+    print(string.format('^2[PVP CLIENT]^7 Téléportation au spawn - Team: %s, Match: %d, Arène: %s', team, matchId, arenaKey or 'unknown'))
     print(string.format('^2[PVP CLIENT]^7 Coordonnées: %.2f, %.2f, %.2f, %.2f', spawn.x, spawn.y, spawn.z, spawn.w))
+    
+    -- STOCKER L'ÉQUIPE DU JOUEUR
+    playerTeam = team
+    print(string.format('^2[PVP CLIENT]^7 Équipe du joueur définie: %s', playerTeam))
     
     local ped = PlayerPedId()
     
@@ -315,7 +322,18 @@ RegisterNetEvent('pvp:teleportToSpawn', function(spawn, team, matchId)
     local teamColor = team == 'team1' and '~b~' or '~r~'
     ESX.ShowNotification(teamColor .. 'Vous êtes dans la ' .. (team == 'team1' and 'Team A (Bleu)' or 'Team B (Rouge)'))
     
-    print('^2[PVP CLIENT]^7 Téléportation terminée, joueur défreeze')
+    -- ========================================
+    -- ACTIVATION DU SYSTÈME DE ZONES
+    -- ========================================
+    if arenaKey then
+        print(string.format('^2[PVP CLIENT]^7 🟢 Activation de la zone pour l\'arène: %s', arenaKey))
+        TriggerEvent('pvp:setArenaZone', arenaKey)
+        TriggerEvent('pvp:enableZones')
+    else
+        print('^1[PVP CLIENT]^7 ⚠️ ERREUR: Pas d\'arenaKey fournie!')
+    end
+    
+    print('^2[PVP CLIENT]^7 Téléportation terminée, joueur freeze')
 end)
 
 -- Event pour respawn un joueur
@@ -409,13 +427,16 @@ end)
 
 -- Event pour la fin d'un round
 RegisterNetEvent('pvp:roundEnd', function(winningTeam, score)
-    print(string.format('^2[PVP CLIENT]^7 Fin du round - Gagnant: %s', winningTeam))
+    print(string.format('^2[PVP CLIENT]^7 Fin du round - Équipe gagnante: %s, Mon équipe: %s, Victoire: %s', 
+        winningTeam, playerTeam or 'unknown', tostring(winningTeam == playerTeam)))
     
-    -- Animation HTML
+    -- Animation HTML avec l'information de victoire/défaite
     SendNUIMessage({
         action = 'showRoundEnd',
         winner = winningTeam,
-        score = score
+        score = score,
+        playerTeam = playerTeam,  -- NOUVEAU: Envoyer l'équipe du joueur
+        isVictory = (winningTeam == playerTeam)  -- NOUVEAU: Calculer si c'est une victoire
     })
     
     PlaySoundFrontend(-1, "CHECKPOINT_PERFECT", "HUD_MINI_GAME_SOUNDSET", true)
@@ -452,17 +473,26 @@ RegisterNetEvent('pvp:hideScoreHUD', function()
     })
 end)
 
--- Event pour la fin du match
+-- ========================================
+-- EVENT FIN DE MATCH AVEC DÉSACTIVATION ZONES
+-- ========================================
 RegisterNetEvent('pvp:matchEnd', function(victory, score)
     print(string.format('^2[PVP CLIENT]^7 Fin du match - Victoire: %s', tostring(victory)))
     
     inMatch = false
     
-    -- Animation HTML
+    -- ========================================
+    -- DÉSACTIVATION DU SYSTÈME DE ZONES
+    -- ========================================
+    print('^2[PVP CLIENT]^7 🔴 Désactivation du système de zones')
+    TriggerEvent('pvp:disableZones')
+    
+    -- Animation HTML avec l'information de victoire/défaite
     SendNUIMessage({
         action = 'showMatchEnd',
         victory = victory,
-        score = score
+        score = score,
+        playerTeam = playerTeam  -- NOUVEAU: Envoyer l'équipe du joueur
     })
     
     if victory then
@@ -473,6 +503,10 @@ RegisterNetEvent('pvp:matchEnd', function(victory, score)
     
     -- Attendre l'animation
     Wait(8000)
+    
+    -- RÉINITIALISER L'ÉQUIPE DU JOUEUR
+    playerTeam = nil
+    print('^2[PVP CLIENT]^7 Équipe du joueur réinitialisée')
     
     -- RESSUSCITER AVANT DE TÉLÉPORTER
     local ped = PlayerPedId()
@@ -514,6 +548,14 @@ RegisterNetEvent('pvp:forceReturnToLobby', function()
     print('^2[PVP CLIENT]^7 Retour forcé au lobby')
     
     inMatch = false
+    
+    -- DÉSACTIVATION DU SYSTÈME DE ZONES
+    print('^2[PVP CLIENT]^7 🔴 Désactivation du système de zones (retour forcé)')
+    TriggerEvent('pvp:disableZones')
+    
+    -- RÉINITIALISER L'ÉQUIPE DU JOUEUR
+    playerTeam = nil
+    print('^2[PVP CLIENT]^7 Équipe du joueur réinitialisée (retour forcé)')
     
     local ped = PlayerPedId()
     

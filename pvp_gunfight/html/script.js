@@ -49,11 +49,11 @@ window.addEventListener('message', function(event) {
         console.log('[PVP UI] GO!');
         showGo();
     } else if (data.action === 'showRoundEnd') {
-        console.log('[PVP UI] Fin du round - Gagnant:', data.winner);
-        showRoundEnd(data.winner, data.score);
+        console.log('[PVP UI] 🎯 Fin du round - Gagnant:', data.winner, '- Mon équipe:', data.playerTeam, '- Victoire:', data.isVictory);
+        showRoundEnd(data.winner, data.score, data.playerTeam, data.isVictory);
     } else if (data.action === 'showMatchEnd') {
-        console.log('[PVP UI] Fin du match - Victoire:', data.victory);
-        showMatchEnd(data.victory, data.score);
+        console.log('[PVP UI] 🏆 Fin du match - Victoire:', data.victory, '- Mon équipe:', data.playerTeam);
+        showMatchEnd(data.victory, data.score, data.playerTeam);
         isInMatch = false;
     } else if (data.action === 'updateScore') {
         console.log('[PVP UI] Mise à jour du score:', data.score);
@@ -816,11 +816,12 @@ function showGo() {
 }
 
 // ========================================
-// ANIMATIONS FIN DE ROUND & MATCH
+// 🎯 ANIMATIONS FIN DE ROUND & MATCH (CORRIGÉES)
 // ========================================
 
-function showRoundEnd(winningTeam, score) {
-    console.log('[PVP UI] Animation fin de round - Gagnant:', winningTeam);
+// 🔥 FIX PRINCIPAL: Animation de fin de round basée sur l'équipe du joueur
+function showRoundEnd(winningTeam, score, playerTeam, isVictory) {
+    console.log('[PVP UI] ✨ Animation fin de round - Équipe gagnante:', winningTeam, '- Mon équipe:', playerTeam, '- Victoire:', isVictory);
     
     const overlay = document.getElementById('round-end-overlay');
     const title = document.getElementById('round-end-title');
@@ -828,12 +829,18 @@ function showRoundEnd(winningTeam, score) {
     const team1Score = document.getElementById('round-score-team1');
     const team2Score = document.getElementById('round-score-team2');
     
-    // Déterminer si c'est une victoire ou défaite
-    const isVictory = (winningTeam === 'team1'); // Ajuster selon la team du joueur
-    
-    title.textContent = isVictory ? 'VICTOIRE' : 'DÉFAITE';
-    title.className = 'round-end-title ' + (isVictory ? 'victory' : 'defeat');
-    subtitle.textContent = isVictory ? 'Round remporté' : 'Round perdu';
+    // 🎯 AFFICHAGE BASÉ SUR SI LE JOUEUR A GAGNÉ OU PERDU
+    if (isVictory) {
+        title.textContent = 'VICTOIRE';
+        title.className = 'round-end-title victory';
+        subtitle.textContent = 'Manche remportée !';
+        console.log('[PVP UI] 🎉 Affichage VICTOIRE pour le joueur');
+    } else {
+        title.textContent = 'DÉFAITE';
+        title.className = 'round-end-title defeat';
+        subtitle.textContent = 'Manche perdue';
+        console.log('[PVP UI] 💀 Affichage DÉFAITE pour le joueur');
+    }
     
     // Afficher les scores
     team1Score.textContent = score.team1;
@@ -848,8 +855,9 @@ function showRoundEnd(winningTeam, score) {
     }, 3000);
 }
 
-function showMatchEnd(victory, score) {
-    console.log('[PVP UI] Animation fin de match - Victoire:', victory);
+// 🔥 FIX PRINCIPAL: Animation de fin de match basée sur la victoire du joueur
+function showMatchEnd(victory, score, playerTeam) {
+    console.log('[PVP UI] ✨ Animation fin de match - Victoire:', victory, '- Mon équipe:', playerTeam);
     
     const overlay = document.getElementById('match-end-overlay');
     const result = document.getElementById('match-end-result');
@@ -857,9 +865,18 @@ function showMatchEnd(victory, score) {
     const team1Score = document.getElementById('final-score-team1');
     const team2Score = document.getElementById('final-score-team2');
     
-    result.textContent = victory ? 'VICTOIRE' : 'DÉFAITE';
-    result.className = 'match-end-result ' + (victory ? 'victory' : 'defeat');
-    message.textContent = victory ? 'Félicitations !' : 'Dommage...';
+    // 🎯 AFFICHAGE BASÉ SUR SI LE JOUEUR A GAGNÉ OU PERDU LE MATCH
+    if (victory) {
+        result.textContent = 'VICTOIRE';
+        result.className = 'match-end-result victory';
+        message.textContent = 'Félicitations ! Vous avez gagné le match ! 🎉';
+        console.log('[PVP UI] 🏆 Affichage VICTOIRE FINALE pour le joueur');
+    } else {
+        result.textContent = 'DÉFAITE';
+        result.className = 'match-end-result defeat';
+        message.textContent = 'Dommage... Vous avez perdu le match. Réessayez !';
+        console.log('[PVP UI] 😢 Affichage DÉFAITE FINALE pour le joueur');
+    }
     
     // Afficher les scores finaux
     team1Score.textContent = score.team1;
@@ -1037,4 +1054,4 @@ function GetParentResourceName() {
     return name;
 }
 
-console.log('[PVP UI] Script initialisé et prêt');
+console.log('[PVP UI] ✅ Script initialisé et prêt - Système victoire/défaite personnalisé activé');

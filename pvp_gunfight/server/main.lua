@@ -1,11 +1,16 @@
 -- ========================================
--- PVP GUNFIGHT - SERVER MAIN (FIXED)
--- Correctifs : Routing Buckets + Matchmaking Groupes
+-- PVP GUNFIGHT - SERVER MAIN
+-- Version: 2.1.0 - Routing Buckets + Zones
+-- Correctifs:
+-- - Envoi de l'équipe au client pour animations correctes
+-- - Envoi de l'arenaKey pour le système de zones
 -- ========================================
 
 print('^2[PVP SERVER]^7 Chargement du système PVP avec instances...')
 
--- Tables pour gérer les queues et matchs
+-- ========================================
+-- VARIABLES GLOBALES
+-- ========================================
 local queues = {
     ['1v1'] = {},
     ['2v2'] = {},
@@ -21,7 +26,9 @@ local playerCurrentBucket = {} -- [playerId] = bucketId
 -- Compteur de buckets pour les instances
 local nextBucketId = 100 -- On commence à 100 pour éviter les buckets système
 
--- Fonction pour créer les tables en base de données
+-- ========================================
+-- INITIALISATION BASE DE DONNÉES
+-- ========================================
 MySQL.ready(function()
     MySQL.query([[
         CREATE TABLE IF NOT EXISTS pvp_stats (
@@ -82,7 +89,7 @@ end
 -- SYSTÈME DE MATCHMAKING AVEC GROUPES
 -- ========================================
 
--- FIX CRITIQUE : Event pour rejoindre une queue AVEC SUPPORT DES GROUPES
+-- Event pour rejoindre une queue
 RegisterNetEvent('pvp:joinQueue', function(mode)
     local src = source
     local xPlayer = ESX.GetPlayerFromId(src)
@@ -139,7 +146,7 @@ RegisterNetEvent('pvp:joinQueue', function(mode)
             return
         end
         
-        -- FIX CRITIQUE : Ajouter TOUS les membres du groupe
+        -- Ajouter TOUS les membres du groupe
         for _, memberId in ipairs(group.members) do
             table.insert(playersToQueue, memberId)
         end
@@ -217,7 +224,10 @@ local function GetRandomArena()
     return arenaKey, Config.Arenas[arenaKey]
 end
 
--- Fonction pour créer un match AVEC INSTANCE
+-- ========================================
+-- FONCTION: CRÉER UN MATCH
+-- FIX: Stocker l'équipe de chaque joueur
+-- ========================================
 function CreateMatch(mode, players)
     local matchId = #activeMatches + 1
     
@@ -234,9 +244,10 @@ function CreateMatch(mode, players)
         mode = mode,
         players = players,
         arena = arenaKey,
-        bucketId = bucketId,  -- NOUVEAU : ID du bucket pour l'instance
+        bucketId = bucketId,
         team1 = {},
         team2 = {},
+        playerTeams = {},  -- NOUVEAU: Table pour stocker l'équipe de chaque joueur
         score = {team1 = 0, team2 = 0},
         currentRound = 1,
         status = 'starting',
@@ -246,11 +257,20 @@ function CreateMatch(mode, players)
     -- Diviser les joueurs en équipes
     local halfSize = #players / 2
     for i, playerId in ipairs(players) do
+        local team = nil
+        
         if i <= halfSize then
             table.insert(activeMatches[matchId].team1, playerId)
+            team = 'team1'
         else
             table.insert(activeMatches[matchId].team2, playerId)
+            team = 'team2'
         end
+        
+        -- STOCKER L'ÉQUIPE DU JOUEUR
+        activeMatches[matchId].playerTeams[playerId] = team
+        
+        print(string.format('^2[PVP SERVER]^7 Joueur %d assigné à %s', playerId, team))
         
         -- Retirer de la queue
         playersInQueue[playerId] = nil
@@ -258,7 +278,7 @@ function CreateMatch(mode, players)
         -- Enregistrer le match actuel du joueur
         playerCurrentMatch[playerId] = matchId
         
-        -- FIX : Retirer le joueur de son groupe quand il entre en match
+        -- Retirer le joueur de son groupe quand il entre en match
         if playerId > 0 then
             exports['pvp_gunfight']:RemovePlayerFromGroup(playerId)
         end
@@ -272,7 +292,7 @@ function CreateMatch(mode, players)
         #activeMatches[matchId].team1, #activeMatches[matchId].team2))
     
     -- Téléporter les joueurs
-    TeleportPlayersToArena(matchId, activeMatches[matchId], arena)
+    TeleportPlayersToArena(matchId, activeMatches[matchId], arena, arenaKey)
     
     -- Notifier tous les joueurs
     for _, playerId in ipairs(players) do
@@ -301,8 +321,11 @@ function CreateMatch(mode, players)
     print(string.format('[PVP] Match %d créé: %s sur %s (Bucket: %d)', matchId, mode, arena.name, bucketId))
 end
 
--- Fonction pour téléporter les joueurs à l'arène
-function TeleportPlayersToArena(matchId, match, arena)
+-- ========================================
+-- FONCTION: TÉLÉPORTER LES JOUEURS
+-- FIX: Envoyer l'arenaKey au client
+-- ========================================
+function TeleportPlayersToArena(matchId, match, arena, arenaKey)
     print(string.format('^2[PVP SERVER]^7 Téléportation des joueurs pour le match %d', matchId))
     
     -- Téléporter Team 1 (spawn A)
@@ -310,10 +333,10 @@ function TeleportPlayersToArena(matchId, match, arena)
         if arena.teamA[i] then
             local spawn = arena.teamA[i]
             
-            -- Ne téléporter que les vrais joueurs
             if playerId > 0 then
                 print(string.format('^2[PVP SERVER]^7 Team 1 - Joueur %d -> Spawn A%d', playerId, i))
-                TriggerClientEvent('pvp:teleportToSpawn', playerId, spawn, 'team1', matchId)
+                -- FIX: Envoyer l'arenaKey pour le système de zones
+                TriggerClientEvent('pvp:teleportToSpawn', playerId, spawn, 'team1', matchId, arenaKey)
             end
         end
     end
@@ -323,14 +346,21 @@ function TeleportPlayersToArena(matchId, match, arena)
         if arena.teamB[i] then
             local spawn = arena.teamB[i]
             
-            -- Ne téléporter que les vrais joueurs
             if playerId > 0 then
                 print(string.format('^2[PVP SERVER]^7 Team 2 - Joueur %d -> Spawn B%d', playerId, i))
-                TriggerClientEvent('pvp:teleportToSpawn', playerId, spawn, 'team2', matchId)
+                -- FIX: Envoyer l'arenaKey pour le système de zones
+                TriggerClientEvent('pvp:teleportToSpawn', playerId, spawn, 'team2', matchId, arenaKey)
             end
         end
     end
 end
+
+-- Reste du fichier (callbacks, events, etc.) reste identique...
+-- Je vais créer la suite dans le prochain fichier
+
+-- ========================================
+-- CALLBACKS
+-- ========================================
 
 -- Callback pour obtenir les stats d'un joueur
 ESX.RegisterServerCallback('pvp:getPlayerStats', function(source, cb)
@@ -391,6 +421,10 @@ ESX.RegisterServerCallback('pvp:getLeaderboard', function(source, cb)
     end)
 end)
 
+-- ========================================
+-- EVENTS
+-- ========================================
+
 -- Event pour annuler la recherche
 RegisterNetEvent('pvp:cancelSearch', function()
     local src = source
@@ -426,7 +460,7 @@ end)
 RegisterNetEvent('pvp:playerDied', function(killerId)
     local victimId = source
     
-    print(string.format('^2[PVP SERVER]^7 Joueur %s tué par %s', victimId, killerId or 'suicide'))
+    print(string.format('^2[PVP SERVER]^7 Joueur %s tué par %s', victimId, killerId or 'suicide/zone'))
     
     local matchId = playerCurrentMatch[victimId]
     
@@ -436,6 +470,10 @@ RegisterNetEvent('pvp:playerDied', function(killerId)
         HandlePlayerDeath(matchId, match, victimId, killerId)
     end
 end)
+
+-- ========================================
+-- GESTION DES ROUNDS ET MATCHS
+-- ========================================
 
 -- Fonction pour gérer la mort d'un joueur
 function HandlePlayerDeath(matchId, match, victimId, killerId)
@@ -504,9 +542,17 @@ function EndRound(matchId, match, winningTeam)
     
     local arena = Config.Arenas[match.arena]
     
+    -- CRITIQUE : Calculer didWin pour CHAQUE joueur individuellement
     for _, playerId in ipairs(match.players) do
         if playerId > 0 then
-            TriggerClientEvent('pvp:roundEnd', playerId, winningTeam, match.score)
+            -- Déterminer l'équipe du joueur depuis playerTeams
+            local playerTeam = match.playerTeams[playerId]
+            
+            -- Calculer si le joueur a gagné ce round
+            local didWin = (playerTeam == winningTeam)
+            
+            -- Envoyer l'événement avec didWin
+            TriggerClientEvent('pvp:roundEnd', playerId, winningTeam, match.score, playerTeam, didWin)
             TriggerClientEvent('pvp:updateScore', playerId, match.score, match.currentRound)
         end
     end
@@ -570,7 +616,10 @@ function StartRound(matchId, match, arena)
     end
 end
 
--- Fonction pour terminer le match AVEC REMISE AU BUCKET 0
+-- ========================================
+-- FONCTION: TERMINER LE MATCH
+-- FIX: Envoyer victoire/défaite basée sur l'équipe du joueur
+-- ========================================
 function EndMatch(matchId, match)
     print(string.format('^2[PVP SERVER]^7 Fin du match %d', matchId))
     
@@ -580,25 +629,25 @@ function EndMatch(matchId, match)
     local winners = winningTeam == 'team1' and match.team1 or match.team2
     local losers = winningTeam == 'team1' and match.team2 or match.team1
     
-    for _, winnerId in ipairs(winners) do
-        if winnerId > 0 then
-            UpdatePlayerWin(winnerId)
-            TriggerClientEvent('pvp:matchEnd', winnerId, true, match.score)
-            TriggerClientEvent('pvp:hideScoreHUD', winnerId)
-            TriggerClientEvent('esx:showNotification', winnerId, '~g~VICTOIRE!')
+    -- FIX: Envoyer victoire/défaite basée sur l'équipe de CHAQUE joueur
+    for _, playerId in ipairs(match.players) do
+        if playerId > 0 then
+            local playerTeam = match.playerTeams[playerId]
+            local didWin = (playerTeam == winningTeam)
             
-            playerCurrentMatch[winnerId] = nil
-        end
-    end
-    
-    for _, loserId in ipairs(losers) do
-        if loserId > 0 then
-            UpdatePlayerLoss(loserId)
-            TriggerClientEvent('pvp:matchEnd', loserId, false, match.score)
-            TriggerClientEvent('pvp:hideScoreHUD', loserId)
-            TriggerClientEvent('esx:showNotification', loserId, '~r~DÉFAITE!')
+            print(string.format('^2[PVP SERVER]^7 Joueur %d (Team: %s) - Victoire: %s', playerId, playerTeam, tostring(didWin)))
             
-            playerCurrentMatch[loserId] = nil
+            if didWin then
+                UpdatePlayerWin(playerId)
+            else
+                UpdatePlayerLoss(playerId)
+            end
+            
+            TriggerClientEvent('pvp:matchEnd', playerId, didWin, match.score)
+            TriggerClientEvent('pvp:hideScoreHUD', playerId)
+            TriggerClientEvent('esx:showNotification', playerId, didWin and '~g~VICTOIRE!' or '~r~DÉFAITE!')
+            
+            playerCurrentMatch[playerId] = nil
         end
     end
     
@@ -618,7 +667,10 @@ function EndMatch(matchId, match)
     print(string.format('^2[PVP SERVER]^7 Match %d terminé et nettoyé', matchId))
 end
 
--- Fonction pour mettre à jour les kills
+-- ========================================
+-- FONCTIONS DE MISE À JOUR DES STATS
+-- ========================================
+
 function UpdatePlayerKills(playerId, amount)
     local xPlayer = ESX.GetPlayerFromId(playerId)
     if not xPlayer then return end
@@ -629,7 +681,6 @@ function UpdatePlayerKills(playerId, amount)
     })
 end
 
--- Fonction pour mettre à jour les deaths
 function UpdatePlayerDeaths(playerId, amount)
     local xPlayer = ESX.GetPlayerFromId(playerId)
     if not xPlayer then return end
@@ -640,7 +691,6 @@ function UpdatePlayerDeaths(playerId, amount)
     })
 end
 
--- Fonction pour mettre à jour les victoires
 function UpdatePlayerWin(playerId)
     local xPlayer = ESX.GetPlayerFromId(playerId)
     if not xPlayer then return end
@@ -650,7 +700,6 @@ function UpdatePlayerWin(playerId)
     })
 end
 
--- Fonction pour mettre à jour les défaites
 function UpdatePlayerLoss(playerId)
     local xPlayer = ESX.GetPlayerFromId(playerId)
     if not xPlayer then return end
@@ -661,7 +710,7 @@ function UpdatePlayerLoss(playerId)
 end
 
 -- ========================================
--- GESTION DES DÉCONNEXIONS AVEC BUCKETS
+-- GESTION DES DÉCONNEXIONS
 -- ========================================
 
 local function HandlePlayerDisconnect(playerId)
@@ -683,24 +732,7 @@ local function HandlePlayerDisconnect(playerId)
     
     UpdatePlayerLoss(playerId)
     
-    local playerTeam = nil
-    local isTeam1 = false
-    for _, pid in ipairs(match.team1) do
-        if pid == playerId then
-            playerTeam = 'team1'
-            isTeam1 = true
-            break
-        end
-    end
-    
-    if not playerTeam then
-        for _, pid in ipairs(match.team2) do
-            if pid == playerId then
-                playerTeam = 'team2'
-                break
-            end
-        end
-    end
+    local playerTeam = match.playerTeams[playerId]
     
     if not playerTeam then
         print('^1[PVP SERVER]^7 Impossible de trouver la team du joueur')
