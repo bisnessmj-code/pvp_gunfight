@@ -1,8 +1,9 @@
 -- ================================================================================================
--- GUNFIGHT ARENA - CONFIGURATION v3.1 (CORRIGÉE)
+-- GUNFIGHT ARENA - CONFIGURATION v3.2 (AVEC BRIDGE INVENTAIRE)
 -- ================================================================================================
 -- ✅ Auto-join DÉSACTIVÉ (entrée uniquement via PED)
 -- ✅ Sortie de zone = nettoyage automatique de l'instance
+-- ✅ Configuration du bridge d'inventaire
 -- ================================================================================================
 
 Config = {}
@@ -15,6 +16,34 @@ Config.DebugClient = false
 Config.DebugServer = false
 Config.DebugNUI = false
 Config.DebugInstance = false
+
+-- ================================================================================================
+-- 🆕 CONFIGURATION DU BRIDGE D'INVENTAIRE
+-- ================================================================================================
+-- Options: "auto", "qs-inventory", "ox_inventory", "qb-inventory", "vanilla"
+-- "auto" = détection automatique (recommandé)
+Config.InventorySystem = "qs-inventory"
+
+-- Donner les munitions séparément de l'arme (pour certains inventaires)
+Config.GiveAmmoSeparately = false
+
+-- Retirer toutes les armes à la sortie (ou seulement celle de l'arène)
+Config.RemoveAllWeaponsOnExit = false
+
+-- Types de munitions par arme (pour les inventaires qui les gèrent séparément)
+Config.WeaponAmmoTypes = {
+    ["weapon_pistol50"] = "ammo-9",           -- qs-inventory
+    ["weapon_pistol"] = "ammo-9",
+    ["weapon_combatpistol"] = "ammo-9",
+    ["weapon_appistol"] = "ammo-9",
+    ["weapon_assaultrifle"] = "ammo-rifle",
+    ["weapon_carbinerifle"] = "ammo-rifle",
+    ["weapon_advancedrifle"] = "ammo-rifle",
+    ["weapon_microsmg"] = "ammo-9",
+    ["weapon_smg"] = "ammo-9",
+    ["weapon_pumpshotgun"] = "ammo-shotgun",
+    ["weapon_sawnoffshotgun"] = "ammo-shotgun"
+}
 
 -- ================================================================================================
 -- SYSTÈME D'INSTANCES (ROUTING BUCKETS)
@@ -279,6 +308,7 @@ Config.Threads = {
 -- ================================================================================================
 -- FIN DE LA CONFIGURATION
 -- ================================================================================================
-print("^2[Gunfight Arena v3.1]^0 Configuration chargée")
-print("^3[Gunfight Arena v3.1]^0 Auto-join: ^1DÉSACTIVÉ^0 (entrée via PED uniquement)")
-print("^3[Gunfight Arena v3.1]^0 Instances: " .. (Config.UseInstances and "^2ACTIVÉES" or "^1DÉSACTIVÉES"))
+print("^2[Gunfight Arena v3.2-Bridge]^0 Configuration chargée")
+print("^3[Gunfight Arena v3.2-Bridge]^0 Auto-join: ^1DÉSACTIVÉ^0 (entrée via PED uniquement)")
+print("^3[Gunfight Arena v3.2-Bridge]^0 Instances: " .. (Config.UseInstances and "^2ACTIVÉES" or "^1DÉSACTIVÉES"))
+print("^3[Gunfight Arena v3.2-Bridge]^0 Bridge inventaire: ^2" .. (Config.InventorySystem or "auto") .. "^0")

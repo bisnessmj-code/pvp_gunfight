@@ -1,7 +1,8 @@
 -- ================================================================================================
--- GUNFIGHT ARENA - CLIENT v3.1 (CORRIGÉ)
+-- GUNFIGHT ARENA - CLIENT v3.2 (AVEC BRIDGE INVENTAIRE)
 -- ================================================================================================
--- ✅ Auto-join DÉSACTIVÉ (thread commenté)
+-- ✅ Auto-join DÉSACTIVÉ
+-- ✅ Bridge d'inventaire pour compatibilité qs-inventory, ox_inventory, qb-inventory
 -- ✅ Sortie de zone = notification serveur pour nettoyage instance
 -- ================================================================================================
 
@@ -39,6 +40,8 @@ local function DebugLog(message, type)
         prefix = "^5[GF-Instance]^0"
     elseif type == "ped" then
         prefix = "^3[GF-PED]^0"
+    elseif type == "weapon" then
+        prefix = "^7[GF-WEAPON]^0"
     end
     
     print(prefix .. " " .. message)
@@ -199,7 +202,7 @@ RegisterNUICallback('zoneSelected', function(data, cb)
 end)
 
 -- ================================================================================================
--- EVENT : REJOINDRE/RESPAWN ARÈNE
+-- EVENT : REJOINDRE/RESPAWN ARÈNE (AVEC BRIDGE D'INVENTAIRE)
 -- ================================================================================================
 RegisterNetEvent('gunfightarena:join')
 AddEventHandler('gunfightarena:join', function(zoneIdentifier)
@@ -224,8 +227,9 @@ AddEventHandler('gunfightarena:join', function(zoneIdentifier)
         ClearPedTasksImmediately(playerPed)
         SetEntityHealth(playerPed, GetEntityMaxHealth(playerPed))
         
-        GiveWeaponToPed(playerPed, GetHashKey(Config.WeaponHash), Config.WeaponAmmo, false, true)
-        SetPedAmmo(playerPed, GetHashKey(Config.WeaponHash), Config.WeaponAmmo)
+        -- ✅ NOUVEAU : Utilisation du bridge d'inventaire au lieu des natives
+        DebugLog("Attribution de l'arme via le bridge", "weapon")
+        InventoryBridge.GiveWeapon(Config.WeaponHash, Config.WeaponAmmo)
         
         SetEntityInvincible(playerPed, true)
         SetEntityAlpha(playerPed, Config.SpawnAlpha, false)
@@ -276,14 +280,13 @@ AddEventHandler('gunfightarena:join', function(zoneIdentifier)
 end)
 
 -- ================================================================================================
--- EVENT : SORTIE DE ZONE (CORRIGÉ v3.1)
+-- EVENT : SORTIE DE ZONE (AVEC BRIDGE D'INVENTAIRE)
 -- ================================================================================================
 RegisterNetEvent('gunfightarena:exitZone')
 AddEventHandler('gunfightarena:exitZone', function()
     DebugLog("=== SORTIE DE ZONE ===")
     
     if isInArena then
-        -- 🆕 NOUVEAU v3.1 : Notifier le serveur IMMÉDIATEMENT pour nettoyer l'instance
         TriggerServerEvent('gunfightarena:leaveArena')
         DebugLog("Notification serveur envoyée (nettoyage instance)", "success")
         
@@ -303,7 +306,9 @@ AddEventHandler('gunfightarena:exitZone', function()
             arenaZone = nil
         end
         
-        RemoveWeaponFromPed(PlayerPedId(), GetHashKey(Config.WeaponHash))
+        -- ✅ NOUVEAU : Utilisation du bridge pour retirer l'arme
+        DebugLog("Retrait de l'arme via le bridge", "weapon")
+        InventoryBridge.RemoveWeapon(Config.WeaponHash)
         
         SetEntityCoords(PlayerPedId(), Config.LobbySpawn.x, Config.LobbySpawn.y, Config.LobbySpawn.z)
         if Config.LobbySpawnHeading then
@@ -322,7 +327,7 @@ AddEventHandler('gunfightarena:exitZone', function()
 end)
 
 -- ================================================================================================
--- EVENT : SORTIE MANUELLE
+-- EVENT : SORTIE MANUELLE (AVEC BRIDGE D'INVENTAIRE)
 -- ================================================================================================
 RegisterNetEvent('gunfightarena:exit')
 AddEventHandler('gunfightarena:exit', function()
@@ -344,7 +349,10 @@ AddEventHandler('gunfightarena:exit', function()
         arenaZone = nil
     end
     
-    RemoveWeaponFromPed(PlayerPedId(), GetHashKey(Config.WeaponHash))
+    -- ✅ NOUVEAU : Utilisation du bridge pour retirer l'arme
+    DebugLog("Retrait de l'arme via le bridge", "weapon")
+    InventoryBridge.RemoveWeapon(Config.WeaponHash)
+    
     SetEntityCoords(PlayerPedId(), Config.LobbySpawn.x, Config.LobbySpawn.y, Config.LobbySpawn.z)
     if Config.LobbySpawnHeading then
         SetEntityHeading(PlayerPedId(), Config.LobbySpawnHeading)
@@ -547,41 +555,6 @@ RegisterNUICallback('closeGlobalLeaderboardUI', function(data, cb)
 end)
 
 -- ================================================================================================
--- ⚠️ THREAD AUTO-JOIN DÉSACTIVÉ (v3.1)
--- ================================================================================================
--- Ce thread est commenté pour empêcher l'entrée automatique dans l'arène.
--- Les joueurs DOIVENT passer par le PED du lobby pour rejoindre une zone.
---[[
-if Config.AutoJoin then
-    Citizen.CreateThread(function()
-        while true do
-            Citizen.Wait(Config.AutoJoinCheckInterval)
-            
-            if not isInArena then
-                local playerPed = PlayerPedId()
-                local playerPos = GetEntityCoords(playerPed)
-                local zoneToJoin = nil
-                
-                for i = 1, 4 do
-                    local zoneCfg = Config["Zone" .. i]
-                    if zoneCfg and zoneCfg.enabled then
-                        if #(playerPos - zoneCfg.center) < zoneCfg.radius then
-                            zoneToJoin = i
-                            break
-                        end
-                    end
-                end
-
-                if zoneToJoin then
-                    TriggerServerEvent('gunfightarena:joinRequest', zoneToJoin)
-                end
-            end
-        end
-    end)
-end
---]]
-
--- ================================================================================================
 -- NETTOYAGE
 -- ================================================================================================
 AddEventHandler('onResourceStop', function(resourceName)
@@ -597,6 +570,6 @@ end)
 -- ================================================================================================
 Citizen.CreateThread(function()
     Wait(1000)
-    print("^2[Gunfight Arena v3.1]^0 Client démarré")
-    print("^3[Gunfight Arena v3.1]^0 Auto-join: ^1DÉSACTIVÉ^0")
+    print("^2[Gunfight Arena v3.2-Bridge]^0 Client démarré avec bridge d'inventaire")
+    print("^3[Gunfight Arena v3.2-Bridge]^0 Auto-join: ^1DÉSACTIVÉ^0")
 end)

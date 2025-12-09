@@ -6,9 +6,9 @@ game 'gta5'
 -- Importation recommandée pour ESX
 shared_script '@es_extended/imports.lua'
 
-description 'Gestion d\'Arène Gunfight - Version PED + Spawn Aléatoire'
+description 'Gunfight Arena - v3.2 avec Bridge d\'Inventaire (compatible qs-inventory, ox_inventory, qb-inventory)'
 author 'kichta'
-version '3.0.0'
+version '3.2.0'
 
 shared_script 'config.lua'
 
@@ -18,12 +18,14 @@ client_scripts {
     '@PolyZone/EntityZone.lua',
     '@PolyZone/CircleZone.lua',
     '@PolyZone/ComboZone.lua',
+    'bridge_inventory.lua',        -- ✅ NOUVEAU : Bridge d'inventaire
     'client.lua',
     'custom_revive.lua'
 }
 
 server_scripts {
     '@mysql-async/lib/MySQL.lua',
+    'bridge_inventory_server.lua',  -- ✅ NOUVEAU : Bridge d'inventaire serveur
     'server.lua'
 }
 
@@ -44,3 +46,6 @@ dependencies {
     'es_extended',
     'PolyZone'
 }
+
+-- Dépendances optionnelles (inventaires)
+-- Aucune n'est requise, le bridge détecte automatiquement
