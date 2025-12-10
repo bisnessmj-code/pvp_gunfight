@@ -7,6 +7,7 @@ local inQueue = false
 local queueStartTime = 0
 local inMatch = false
 local playerTeam = nil
+local canShoot = false -- ⚡ NOUVEAU : Contrôle du tir
 
 -- ========================================
 -- CACHE DES NATIVES POUR PERFORMANCES
@@ -21,6 +22,15 @@ local IsEntityDead = IsEntityDead
 local GetPedSourceOfDeath = GetPedSourceOfDeath
 local NetworkGetPlayerIndexFromPed = NetworkGetPlayerIndexFromPed
 local GetPlayerServerId = GetPlayerServerId
+
+-- ========================================
+-- CONFIGURATION ARMES
+-- ========================================
+local WEAPON_CONFIG = {
+    hash = GetHashKey('WEAPON_PISTOL50'),
+    ammo = 250,  -- Munitions totales
+    clipSize = 9 -- Taille du chargeur (Cal 50 = 9 balles)
+}
 
 -- ========================================
 -- SPAWN PED
@@ -58,6 +68,23 @@ local function SpawnPed()
     
     pedSpawned = true
     DebugSuccess('PED spawné avec succès')
+end
+
+-- ========================================
+-- FONCTION: DONNER ARMES (AVEC MUNITIONS NORMALES)
+-- ========================================
+local function GiveMatchWeapons(ped)
+    -- Retirer toutes les armes
+    RemoveAllPedWeapons(ped, true)
+    
+    -- Donner le Cal 50 avec munitions normales (PAS INFINIES)
+    GiveWeaponToPed(ped, WEAPON_CONFIG.hash, WEAPON_CONFIG.ammo, false, true)
+    SetCurrentPedWeapon(ped, WEAPON_CONFIG.hash, true)
+    
+    -- ⚠️ IMPORTANT : NE PAS utiliser SetPedInfiniteAmmoClip
+    -- On veut que le joueur recharge normalement
+    
+    DebugClient('✅ Armes données - %d munitions (rechargement normal)', WEAPON_CONFIG.ammo)
 end
 
 -- ========================================
@@ -273,7 +300,7 @@ RegisterNetEvent('pvp:searchCancelled', function()
 end)
 
 RegisterNetEvent('pvp:teleportToSpawn', function(spawn, team, matchId, arenaKey)
-    DebugClient('Téléportation au spawn - Team: %s, Match: %d, Arène: %s', team, matchId, arenaKey or 'unknown')
+    DebugClient('🔵 Téléportation au spawn - Team: %s, Match: %d, Arène: %s', team, matchId, arenaKey or 'unknown')
     DebugClient('Coordonnées: %.2f, %.2f, %.2f, %.2f', spawn.x, spawn.y, spawn.z, spawn.w)
     
     playerTeam = team
@@ -281,37 +308,43 @@ RegisterNetEvent('pvp:teleportToSpawn', function(spawn, team, matchId, arenaKey)
     
     local ped = PlayerPedId()
     
+    -- Ressusciter si mort
     if IsEntityDead(ped) then
         NetworkResurrectLocalPlayer(spawn.x, spawn.y, spawn.z, spawn.w, true, false)
     end
     
+    -- Fade out
     DoScreenFadeOut(500)
     Wait(500)
     
+    -- Téléportation
     SetEntityCoords(ped, spawn.x, spawn.y, spawn.z, false, false, false, false)
     SetEntityHeading(ped, spawn.w)
     
+    -- Freeze
     FreezeEntityPosition(ped, true)
     
+    -- Vie et armure
     SetEntityHealth(ped, 200)
     SetPedArmour(ped, 100)
     
+    -- Reset visuel
     ClearPedBloodDamage(ped)
     ResetPedVisibleDamage(ped)
     
-    RemoveAllPedWeapons(ped, true)
-    GiveWeaponToPed(ped, GetHashKey('WEAPON_PISTOL50'), 250, false, true)
-    SetCurrentPedWeapon(ped, GetHashKey('WEAPON_PISTOL50'), true)
-    
-    SetPedInfiniteAmmoClip(ped, true)
+    -- 🔫 DONNER ARMES (AVEC RECHARGEMENT NORMAL)
+    GiveMatchWeapons(ped)
     
     Wait(500)
     
+    -- Fade in
     DoScreenFadeIn(500)
     
+    -- Notification
     local teamColor = team == 'team1' and '~b~' or '~r~'
     ESX.ShowNotification(teamColor .. 'Vous êtes dans la ' .. (team == 'team1' and 'Team A (Bleu)' or 'Team B (Rouge)'))
     
+    -- Activer zones
     if arenaKey then
         DebugClient('🟢 Activation de la zone pour l\'arène: %s', arenaKey)
         TriggerEvent('pvp:setArenaZone', arenaKey)
@@ -320,41 +353,44 @@ RegisterNetEvent('pvp:teleportToSpawn', function(spawn, team, matchId, arenaKey)
         DebugError('⚠️ ERREUR: Pas d\'arenaKey fournie!')
     end
     
-    DebugClient('Téléportation terminée, joueur freeze')
+    DebugClient('✅ Téléportation terminée, joueur freeze avec armes normales')
 end)
 
 RegisterNetEvent('pvp:respawnPlayer', function(spawn)
-    DebugClient('Respawn du joueur')
+    DebugClient('🔵 Respawn du joueur')
     
     local ped = PlayerPedId()
     
+    -- Ressusciter si mort
     if IsEntityDead(ped) then
         NetworkResurrectLocalPlayer(spawn.x, spawn.y, spawn.z, spawn.w, true, false)
     end
     
+    -- Fade out
     DoScreenFadeOut(300)
     Wait(300)
     
+    -- Téléportation
     SetEntityCoords(ped, spawn.x, spawn.y, spawn.z, false, false, false, false)
     SetEntityHeading(ped, spawn.w)
     
+    -- Vie et armure
     SetEntityHealth(ped, 200)
     SetPedArmour(ped, 100)
     
+    -- Reset visuel
     ClearPedBloodDamage(ped)
     ResetPedVisibleDamage(ped)
     
-    RemoveAllPedWeapons(ped, true)
-    GiveWeaponToPed(ped, GetHashKey('WEAPON_PISTOL50'), 250, false, true)
-    SetCurrentPedWeapon(ped, GetHashKey('WEAPON_PISTOL50'), true)
-    
-    SetPedInfiniteAmmoClip(ped, true)
+    -- 🔫 DONNER ARMES (AVEC RECHARGEMENT NORMAL)
+    GiveMatchWeapons(ped)
     
     Wait(300)
     
+    -- Fade in
     DoScreenFadeIn(300)
     
-    DebugClient('Respawn terminé')
+    DebugClient('✅ Respawn terminé avec armes normales')
 end)
 
 RegisterNetEvent('pvp:freezePlayer', function()
@@ -364,12 +400,18 @@ RegisterNetEvent('pvp:freezePlayer', function()
 end)
 
 RegisterNetEvent('pvp:roundStart', function(roundNumber)
-    DebugClient('Début du round %d', roundNumber)
+    DebugClient('🎮 Début du round %d', roundNumber)
     
     local ped = PlayerPedId()
     
+    -- Freeze
     FreezeEntityPosition(ped, true)
     
+    -- ⚡ BLOQUER LES TIRS PENDANT LE COUNTDOWN
+    canShoot = false
+    DebugClient('🚫 Tirs bloqués pendant le countdown')
+    
+    -- Animation round start
     SendNUIMessage({
         action = 'showRoundStart',
         round = roundNumber
@@ -377,6 +419,7 @@ RegisterNetEvent('pvp:roundStart', function(roundNumber)
     
     Wait(2000)
     
+    -- Countdown
     for i = 3, 1, -1 do
         SendNUIMessage({
             action = 'showCountdown',
@@ -386,6 +429,7 @@ RegisterNetEvent('pvp:roundStart', function(roundNumber)
         Wait(1000)
     end
     
+    -- GO!
     SendNUIMessage({
         action = 'showGo'
     })
@@ -393,12 +437,21 @@ RegisterNetEvent('pvp:roundStart', function(roundNumber)
     
     Wait(1000)
     
+    -- Unfreeze
     FreezeEntityPosition(ped, false)
+    
+    -- ✅ AUTORISER LES TIRS MAINTENANT
+    canShoot = true
+    DebugSuccess('✅ Round %d lancé - Joueur défreeze - TIRS AUTORISÉS', roundNumber)
 end)
 
 RegisterNetEvent('pvp:roundEnd', function(winningTeam, score)
-    DebugClient('Fin du round - Équipe gagnante: %s, Mon équipe: %s, Victoire: %s', 
+    DebugClient('🏁 Fin du round - Équipe gagnante: %s, Mon équipe: %s, Victoire: %s', 
         winningTeam, playerTeam or 'unknown', tostring(winningTeam == playerTeam))
+    
+    -- ⚡ BLOQUER LES TIRS PENDANT L'ÉCRAN DE FIN
+    canShoot = false
+    DebugClient('🚫 Tirs bloqués (fin de round)')
     
     SendNUIMessage({
         action = 'showRoundEnd',
@@ -412,7 +465,7 @@ RegisterNetEvent('pvp:roundEnd', function(winningTeam, score)
 end)
 
 RegisterNetEvent('pvp:updateScore', function(score, round)
-    DebugClient('Mise à jour score - Team1: %d, Team2: %d, Round: %d', score.team1, score.team2, round)
+    DebugClient('📊 Mise à jour score - Team1: %d, Team2: %d, Round: %d', score.team1, score.team2, round)
     
     SendNUIMessage({
         action = 'updateScore',
@@ -440,9 +493,10 @@ RegisterNetEvent('pvp:hideScoreHUD', function()
 end)
 
 RegisterNetEvent('pvp:matchEnd', function(victory, score)
-    DebugClient('Fin du match - Victoire: %s', tostring(victory))
+    DebugClient('🏆 Fin du match - Victoire: %s', tostring(victory))
     
     inMatch = false
+    canShoot = false -- Bloquer les tirs
     
     DebugClient('🔴 Désactivation du système de zones')
     TriggerEvent('pvp:disableZones')
@@ -485,9 +539,8 @@ RegisterNetEvent('pvp:matchEnd', function(victory, score)
     ClearPedBloodDamage(ped)
     ResetPedVisibleDamage(ped)
     
+    -- Retirer toutes les armes au retour lobby
     RemoveAllPedWeapons(ped, true)
-    
-    SetPedInfiniteAmmoClip(ped, false)
     
     DoScreenFadeIn(500)
     
@@ -495,9 +548,10 @@ RegisterNetEvent('pvp:matchEnd', function(victory, score)
 end)
 
 RegisterNetEvent('pvp:forceReturnToLobby', function()
-    DebugClient('Retour forcé au lobby')
+    DebugClient('🔴 Retour forcé au lobby')
     
     inMatch = false
+    canShoot = false
     
     DebugClient('🔴 Désactivation du système de zones (retour forcé)')
     TriggerEvent('pvp:disableZones')
@@ -526,8 +580,6 @@ RegisterNetEvent('pvp:forceReturnToLobby', function()
     ResetPedVisibleDamage(ped)
     RemoveAllPedWeapons(ped, true)
     FreezeEntityPosition(ped, false)
-    
-    SetPedInfiniteAmmoClip(ped, false)
     
     DoScreenFadeIn(500)
 end)
@@ -558,13 +610,13 @@ CreateThread(function()
                 end
             end
             
-            DebugClient('Joueur mort - Killer: %s', killerPlayer or 'suicide')
+            DebugClient('💀 Joueur mort - Killer: %s', killerPlayer or 'suicide')
             
             TriggerServerEvent('pvp:playerDied', killerPlayer)
             
             -- Attendre la résurrection
             while IsEntityDead(ped) do
-                Wait(500) -- Augmenté de 100 à 500ms
+                Wait(500)
             end
         end
         
@@ -573,12 +625,11 @@ CreateThread(function()
 end)
 
 -- ========================================
--- THREAD: BLOCAGE ARMES (ULTRA-OPTIMISÉ)
+-- THREAD: CONTRÔLE ARMES + BLOCAGE TIRS
 -- ========================================
 CreateThread(function()
-    local cal50Hash = GetHashKey('WEAPON_PISTOL50')
-    local lastCheck = 0
-    local checkInterval = 250 -- Vérifier toutes les 250ms au lieu de chaque frame
+    local lastWeaponCheck = 0
+    local weaponCheckInterval = 500 -- Vérifier l'arme toutes les 500ms
     
     while true do
         -- ⚡ OPTIMISATION: Sleep long si pas en match
@@ -591,22 +642,45 @@ CreateThread(function()
         
         local currentTime = GetGameTimer()
         
-        -- Vérifier l'arme seulement toutes les 250ms
-        if currentTime - lastCheck >= checkInterval then
-            lastCheck = currentTime
+        -- ========================================
+        -- 1. BLOQUER LES TIRS SI canShoot = false
+        -- ========================================
+        if not canShoot then
+            DisableControlAction(0, 24, true)  -- Attack (clic gauche)
+            DisableControlAction(0, 25, true)  -- Aim (clic droit)
+            DisableControlAction(0, 257, true) -- Attack 2
+            DisableControlAction(0, 140, true) -- Melee Attack Light
+            DisableControlAction(0, 141, true) -- Melee Attack Heavy
+            DisableControlAction(0, 142, true) -- Melee Attack Alternate
+        end
+        
+        -- ========================================
+        -- 2. VÉRIFIER L'ARME (toutes les 500ms)
+        -- ========================================
+        if currentTime - lastWeaponCheck >= weaponCheckInterval then
+            lastWeaponCheck = currentTime
             
             local ped = PlayerPedId()
             local hasWeapon, weaponHash = GetCurrentPedWeapon(ped, true)
             
-            if not hasWeapon or weaponHash ~= cal50Hash then
+            -- Si le joueur n'a PAS le Cal 50, le forcer
+            if not hasWeapon or weaponHash ~= WEAPON_CONFIG.hash then
+                DebugWarn('⚠️ Arme incorrecte détectée (hash: %d) - Correction...', weaponHash or 0)
+                
+                -- Retirer toutes les armes
                 RemoveAllPedWeapons(ped, true)
-                GiveWeaponToPed(ped, cal50Hash, 250, false, true)
-                SetCurrentPedWeapon(ped, cal50Hash, true)
-                SetPedInfiniteAmmoClip(ped, true)
+                
+                -- Redonner le Cal 50
+                GiveWeaponToPed(ped, WEAPON_CONFIG.hash, WEAPON_CONFIG.ammo, false, true)
+                SetCurrentPedWeapon(ped, WEAPON_CONFIG.hash, true)
+                
+                DebugSuccess('✅ Cal 50 restauré')
             end
         end
         
-        -- Désactiver les contrôles de changement d'arme
+        -- ========================================
+        -- 3. BLOQUER CHANGEMENT D'ARME
+        -- ========================================
         DisableControlAction(0, 14, true)  -- Scroll up
         DisableControlAction(0, 15, true)  -- Scroll down
         DisableControlAction(0, 16, true)  -- Next weapon
@@ -631,7 +705,7 @@ end)
 -- ========================================
 CreateThread(function()
     while true do
-        Wait(1000) -- OK à 1000ms
+        Wait(1000)
         
         if inQueue then
             local elapsed = math.floor((GetGameTimer() - queueStartTime) / 1000)
@@ -678,7 +752,6 @@ CreateThread(function()
                 end
             end
         end
-        -- Sinon sleep = 1000ms (loin du PED)
         
         Wait(sleep)
     end
@@ -702,4 +775,4 @@ AddEventHandler('onResourceStop', function(resourceName)
     DebugClient('Focus NUI libéré')
 end)
 
-DebugSuccess('Initialisation terminée (version OPTIMISÉE)')
+DebugSuccess('✅ Initialisation terminée (VERSION FINALE - Tirs bloqués countdown + Cal 50 forcé)')

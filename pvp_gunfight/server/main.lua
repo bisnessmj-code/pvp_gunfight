@@ -1,6 +1,6 @@
 -- ========================================
 -- PVP GUNFIGHT - SERVER MAIN  
--- Version: 2.3.0 - Routing Buckets + Zones + ELO + Debug System
+-- Version: 2.3.1 - CORRECTION SYNCHRONISATION ROUTING BUCKETS
 -- ========================================
 
 DebugServer('Chargement du système PVP avec instances et ELO...')
@@ -41,11 +41,19 @@ MySQL.ready(function()
     DebugSuccess('Base de données initialisée')
 end)
 
+-- ========================================
+-- GESTION ROUTING BUCKETS (CORRIGÉE)
+-- ========================================
+
 local function CreateMatchBucket()
     local bucketId = nextBucketId
     nextBucketId = nextBucketId + 1
     
-    DebugBucket('Création du bucket %d', bucketId)
+    DebugBucket('✅ Création du bucket %d', bucketId)
+    
+    -- Configuration du bucket pour permettre la synchronisation
+    SetRoutingBucketPopulationEnabled(bucketId, true)
+    SetRoutingBucketEntityLockdownMode(bucketId, 'strict') -- Mode strict pour empêcher les entités externes
     
     return bucketId
 end
@@ -56,7 +64,10 @@ local function SetPlayerBucket(playerId, bucketId)
     SetPlayerRoutingBucket(playerId, bucketId)
     playerCurrentBucket[playerId] = bucketId
     
-    DebugBucket('Joueur %d assigné au bucket %d', playerId, bucketId)
+    DebugBucket('🔵 Joueur %d assigné au bucket %d', playerId, bucketId)
+    
+    -- Petit délai pour s'assurer que le bucket est bien appliqué
+    Wait(100)
 end
 
 local function ResetPlayerBucket(playerId)
@@ -65,8 +76,34 @@ local function ResetPlayerBucket(playerId)
     SetPlayerRoutingBucket(playerId, 0)
     playerCurrentBucket[playerId] = nil
     
-    DebugBucket('Joueur %d remis dans le bucket public (0)', playerId)
+    DebugBucket('🟢 Joueur %d remis dans le bucket public (0)', playerId)
 end
+
+-- ========================================
+-- FONCTIONS UTILITAIRES
+-- ========================================
+
+local function SyncAllPlayersInMatch(matchId)
+    local match = activeMatches[matchId]
+    if not match then return end
+    
+    DebugBucket('🔄 Synchronisation de tous les joueurs du match %d dans le bucket %d', matchId, match.bucketId)
+    
+    -- S'assurer que TOUS les joueurs sont dans le même bucket
+    for _, playerId in ipairs(match.players) do
+        if playerId > 0 then
+            local currentBucket = GetPlayerRoutingBucket(playerId)
+            if currentBucket ~= match.bucketId then
+                DebugWarn('⚠️ Joueur %d pas dans le bon bucket (%d vs %d), correction...', playerId, currentBucket, match.bucketId)
+                SetPlayerBucket(playerId, match.bucketId)
+            end
+        end
+    end
+end
+
+-- ========================================
+-- MATCHMAKING
+-- ========================================
 
 RegisterNetEvent('pvp:joinQueue', function(mode)
     local src = source
@@ -231,23 +268,38 @@ function CreateMatch(mode, players)
         if playerId > 0 then
             exports['pvp_gunfight']:RemovePlayerFromGroup(playerId)
         end
-        
-        SetPlayerBucket(playerId, bucketId)
     end
     
     DebugServer('Match %d - Bucket: %d', matchId, bucketId)
     DebugServer('Team 1: %d joueurs, Team 2: %d joueurs', 
         #activeMatches[matchId].team1, #activeMatches[matchId].team2)
     
-    TeleportPlayersToArena(matchId, activeMatches[matchId], arena, arenaKey)
+    -- 🔥 IMPORTANT: Assigner TOUS les joueurs au bucket AVANT la téléportation
+    DebugBucket('📌 Attribution des buckets à tous les joueurs...')
+    for _, playerId in ipairs(players) do
+        SetPlayerBucket(playerId, bucketId)
+    end
     
+    -- Petit délai pour s'assurer que les buckets sont appliqués
+    Wait(200)
+    
+    -- Vérifier que tous les joueurs sont bien dans le bucket
+    SyncAllPlayersInMatch(matchId)
+    
+    -- Notification match trouvé
     for _, playerId in ipairs(players) do
         TriggerClientEvent('pvp:matchFound', playerId)
         TriggerClientEvent('esx:showNotification', playerId, '~g~Match trouvé! ~w~Arène: ~b~' .. arena.name)
         TriggerClientEvent('pvp:showScoreHUD', playerId, activeMatches[matchId].score, activeMatches[matchId].currentRound)
     end
     
+    -- Téléportation des joueurs
+    TeleportPlayersToArena(matchId, activeMatches[matchId], arena, arenaKey)
+    
     Wait(3000)
+    
+    -- Re-vérifier la synchronisation avant le freeze
+    SyncAllPlayersInMatch(matchId)
     
     for _, playerId in ipairs(players) do
         if playerId > 0 then
@@ -259,7 +311,7 @@ function CreateMatch(mode, players)
     
     StartRound(matchId, activeMatches[matchId], arena)
     
-    DebugSuccess('Match %d créé: %s sur %s (Bucket: %d)', matchId, mode, arena.name, bucketId)
+    DebugSuccess('✅ Match %d créé: %s sur %s (Bucket: %d)', matchId, mode, arena.name, bucketId)
 end
 
 function TeleportPlayersToArena(matchId, match, arena, arenaKey)
@@ -375,13 +427,17 @@ end)
 RegisterNetEvent('pvp:playerDied', function(killerId)
     local victimId = source
     
-    DebugServer('Joueur %d tué par %s', victimId, killerId or 'suicide/zone')
+    DebugServer('💀 Joueur %d tué par %s', victimId, killerId or 'suicide/zone')
     
     local matchId = playerCurrentMatch[victimId]
     
     if matchId and activeMatches[matchId] then
         local match = activeMatches[matchId]
         DebugServer('Mort dans le match %d', matchId)
+        
+        -- Vérifier la synchronisation bucket
+        SyncAllPlayersInMatch(matchId)
+        
         HandlePlayerDeath(matchId, match, victimId, killerId)
     end
 end)
@@ -449,6 +505,9 @@ function EndRound(matchId, match, winningTeam)
     
     local arena = Config.Arenas[match.arena]
     
+    -- 🔥 IMPORTANT: Re-synchroniser les buckets avant d'envoyer les events
+    SyncAllPlayersInMatch(matchId)
+    
     for _, playerId in ipairs(match.players) do
         if playerId > 0 then
             local playerTeam = match.playerTeams[playerId]
@@ -468,6 +527,9 @@ function EndRound(matchId, match, winningTeam)
         
         match.currentRound = match.currentRound + 1
         
+        -- Re-synchroniser avant le freeze
+        SyncAllPlayersInMatch(matchId)
+        
         for _, playerId in ipairs(match.players) do
             if playerId > 0 then
                 TriggerClientEvent('pvp:freezePlayer', playerId)
@@ -479,6 +541,9 @@ function EndRound(matchId, match, winningTeam)
         RespawnPlayers(matchId, match, arena)
         
         Wait(2000)
+        
+        -- Re-synchroniser avant le démarrage du round
+        SyncAllPlayersInMatch(matchId)
         
         StartRound(matchId, match, arena)
     end
@@ -503,10 +568,13 @@ function RespawnPlayers(matchId, match, arena)
 end
 
 function StartRound(matchId, match, arena)
-    DebugServer('Début du round %d', match.currentRound)
+    DebugServer('🎮 Début du round %d', match.currentRound)
     
     match.status = 'playing'
     match.roundStats = {}
+    
+    -- 🔥 Synchronisation finale avant le début du round
+    SyncAllPlayersInMatch(matchId)
     
     for _, playerId in ipairs(match.players) do
         if playerId > 0 then
@@ -574,7 +642,7 @@ function EndMatch(matchId, match)
     
     Wait(8000)
     
-    DebugBucket('Remise des joueurs du match %d dans le bucket 0', matchId)
+    DebugBucket('🔴 Remise des joueurs du match %d dans le bucket 0', matchId)
     for _, playerId in ipairs(match.players) do
         ResetPlayerBucket(playerId)
     end
@@ -582,7 +650,7 @@ function EndMatch(matchId, match)
     Wait(2000)
     activeMatches[matchId] = nil
     
-    DebugSuccess('Match %d terminé et nettoyé - Stats et ELO mis à jour!', matchId)
+    DebugSuccess('✅ Match %d terminé et nettoyé - Stats et ELO mis à jour!', matchId)
 end
 
 function UpdatePlayerKills(playerId, amount)
@@ -632,7 +700,7 @@ function UpdatePlayerLoss(playerId)
 end
 
 local function HandlePlayerDisconnect(playerId)
-    DebugServer('Gestion de la déconnexion du joueur %d', playerId)
+    DebugServer('🔴 Gestion de la déconnexion du joueur %d', playerId)
     
     ResetPlayerBucket(playerId)
     
@@ -738,4 +806,4 @@ AddEventHandler('playerDropped', function()
     HandlePlayerDisconnect(src)
 end)
 
-DebugSuccess('Système PVP avec instances et ELO chargé!')
+DebugSuccess('✅ Système PVP avec instances et ELO chargé (VERSION CORRIGÉE)!')

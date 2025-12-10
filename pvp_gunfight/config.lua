@@ -4,7 +4,7 @@ Config = {}
 -- SYSTÈME DE DEBUG
 -- ========================================
 Config.Debug = {
-    enabled = false,       -- ⚡ DÉSACTIVÉ PAR DÉFAUT pour les performances
+    enabled = true,       -- ⚡ DÉSACTIVÉ PAR DÉFAUT pour les performances
     
     -- Niveaux de debug (si enabled = true)
     levels = {
@@ -27,7 +27,7 @@ Config.Debug = {
 -- CONFIGURATION DU PED
 -- ========================================
 Config.PedLocation = {
-    coords = vector4(-2660.887940, -763.279114, 5.993408, 184.251968),
+    coords = vector4(-2649.454834, -767.221984, 4.746582, 102.047248),
     model = 's_m_y_dealer_01',
     scenario = 'WORLD_HUMAN_CLIPBOARD'
 }
