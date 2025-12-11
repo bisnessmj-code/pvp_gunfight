@@ -1,7 +1,7 @@
 /* ========================================
    PVP GUNFIGHT - INTERFACE MODERNE
    Design: Professionnel Cyberpunk
-   Résolution: 1920x1080
+   Version: 2.4.0 - Avec Avatars Discord
    ======================================== */
 
 /* ========================================
@@ -84,7 +84,7 @@ body {
 }
 
 /* ========================================
-   MODAL PRINCIPALE (1920x1080 optimisé)
+   MODAL PRINCIPALE
    ======================================== */
 .modal {
     width: 1400px;
@@ -468,7 +468,7 @@ body {
 }
 
 /* ========================================
-   PLAYER AVATAR
+   PLAYER AVATAR - DISCORD STYLE
    ======================================== */
 .player-avatar {
     width: 48px;
@@ -479,12 +479,26 @@ body {
     background: var(--darker-card);
     box-shadow: 0 0 15px var(--glow-cyan);
     flex-shrink: 0;
+    position: relative;
 }
 
 .player-avatar img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    border-radius: 50%;
+}
+
+.player-avatar::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 14px;
+    height: 14px;
+    background: #3ba55c;
+    border-radius: 50%;
+    border: 3px solid var(--darker-card);
 }
 
 /* ========================================
@@ -961,7 +975,7 @@ body {
 }
 
 /* ========================================
-   STATS LAYOUT
+   STATS LAYOUT AVEC AVATAR DISCORD
    ======================================== */
 .stats-layout {
     padding: var(--spacing-lg);
@@ -969,6 +983,22 @@ body {
 
 .stats-header {
     margin-bottom: var(--spacing-xl);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.stats-avatar-container {
+    position: relative;
+}
+
+.stats-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 3px solid var(--primary-cyan);
+    box-shadow: 0 0 25px var(--glow-cyan);
+    object-fit: cover;
 }
 
 .stats-header h2 {
@@ -1031,7 +1061,7 @@ body {
 }
 
 /* ========================================
-   LEADERBOARD
+   LEADERBOARD AVEC AVATARS DISCORD
    ======================================== */
 .leaderboard-layout {
     padding: var(--spacing-lg);
@@ -1097,8 +1127,27 @@ body {
     color: var(--primary-cyan);
 }
 
+/* Cellule joueur avec avatar Discord */
+.player-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.leaderboard-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid var(--primary-cyan);
+    object-fit: cover;
+}
+
+.player-name-lb {
+    font-weight: 600;
+}
+
 /* ========================================
-   INVITATIONS PANEL
+   INVITATIONS PANEL AVEC AVATARS
    ======================================== */
 .invitations-panel {
     position: fixed;
@@ -1180,8 +1229,8 @@ body {
     padding: var(--spacing-md);
     margin-bottom: var(--spacing-sm);
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: var(--spacing-md);
     animation: inviteSlideIn 0.3s ease;
 }
 
@@ -1194,6 +1243,23 @@ body {
         opacity: 1;
         transform: translateX(0);
     }
+}
+
+/* Avatar dans les invitations */
+.invitation-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid var(--primary-cyan);
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px var(--glow-cyan);
+}
+
+.invitation-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .invitation-info {
@@ -1412,14 +1478,14 @@ body {
 }
 
 .hud-container {
-    background: var(--darker-card);
+    /* background: var(--darker-card); */
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg) var(--spacing-xl);
     display: flex;
     align-items: center;
     gap: var(--spacing-lg);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 40px var(--glow-cyan);
+   /* box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 40px var(--glow-cyan); */
     backdrop-filter: blur(10px);
 }
 
@@ -1462,7 +1528,7 @@ body {
 
 .round-info {
     position: absolute;
-    bottom: -35px;
+    top: 35px;
     left: 50%;
     transform: translateX(-50%);
     background: var(--darker-card);
@@ -1641,12 +1707,6 @@ body {
 .score-team.red {
     color: var(--accent-red);
     text-shadow: 0 0 30px var(--glow-red);
-}
-
-.score-separator {
-    color: var(--text-secondary);
-    font-size: 56px;
-    font-weight: 700;
 }
 
 .round-end-subtitle {
